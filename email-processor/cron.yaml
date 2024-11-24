@@ -1,0 +1,4 @@
+cron:
+- description: "Reset Gmail watch method every 12 hours"
+  url: /reset-watch
+  schedule: every 12 hours 
