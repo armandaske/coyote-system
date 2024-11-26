@@ -1,7 +1,7 @@
 from flask import Flask, redirect, request, url_for, g
 from google_api_helpers import get_creds, get_oauth2_flow
 from googleapiclient.discovery import build
-from mail_scraper import mail_scraper_main
+from email_scraper import mail_scraper_main
 from firebase_admin import credentials, firestore, initialize_app
 from os import getenv
 import threading

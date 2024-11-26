@@ -1,5 +1,5 @@
 def main_function(drive_service, sheets_service, calendar_service, firestore_db):
-    from main_function_helpers import get_last_state, get_month_from_file_name, get_year_from_file_name, find_last_subfolder_id, delete_logs, delete_calendar_and_folder,\
+    from sheet_monitor_helpers import get_last_state, get_month_from_file_name, get_year_from_file_name, find_last_subfolder_id, delete_logs, delete_calendar_and_folder,\
         update_calendar_and_folder, update_logs, inspect_logs, create_logs, create_calendar, create_photos_folder, attach_folder_to_calendar, make_file_public, store_state,\
         get_tabs
     import googleapiclient.errors as errors

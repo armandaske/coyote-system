@@ -5,6 +5,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from json import loads
 from os import getenv
+#TODO: Pass enviroment variables to google secret manager
 
 # If modifying these SCOPES, delete the stored refresh token.
 SCOPES = ['https://www.googleapis.com/auth/drive', 

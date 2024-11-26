@@ -672,7 +672,7 @@ def get_emails(sheets_service, staff):
                 # Go through each row in column A
                 for row in values:
                     found=False
-                    if row and row[0].strip() == person.strip():
+                    if row[0] and row[0].strip() == person.strip():
                         found=True
                         if row[1]:
                             mails.append(row[1].strip())
