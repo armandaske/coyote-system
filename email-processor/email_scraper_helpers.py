@@ -16,7 +16,8 @@ unificar_nombres_tours_dict={'La mejor caminata hasta Hierve el Agua y mezcal':'
                     'Hike en Hierve y Rincones Secretos + Tapetes Tradicionales' : 'Ultimate Hike Hierve el Agua + Teotitlán',
                     'Caminata de Arte Urbano' : 'Street Art Walk',
                     'Ultimate Hierve el Agua Hike & Teotitlan Textiles': 'Ultimate Hike Hierve el Agua + Teotitlán',
-                    'Ultimate Hike Hierve el Agua & Mezcal': 'Ultimate Hike Hierve el Agua + Mezcal'
+                    'Ultimate Hike Hierve el Agua & Mezcal': 'Ultimate Hike Hierve el Agua + Mezcal',
+                    'Hiking in the Enchanted Forest of Ixtepeji with Rescue Dogs': 'Hike with caravana canina rescue dogs Ixtepeji forest'
                     
                    }
 
