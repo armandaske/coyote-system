@@ -2,7 +2,7 @@ from email import policy
 from email.parser import BytesParser
 from base64 import urlsafe_b64decode
 from re import findall, sub
-from mail_scraper_helpers import booking_logic, cancellation_logic, rebooking_logic, other_logic, add_label_to_email, get_label_id, get_current_time, get_time_week_before
+from email_scraper_helpers import booking_logic, cancellation_logic, rebooking_logic, other_logic, add_label_to_email, get_label_id, get_current_time, get_time_week_before
 
 
 platforms_by_address_dict={
@@ -54,7 +54,7 @@ def get_action_for_email(subject,platform):
     return actions['otro']
 
 
-def mail_scraper_main(drive_service, sheets_service, gmail_service):
+def email_scraper_main(drive_service, sheets_service, gmail_service):
     procesado_label_id=get_label_id(gmail_service, procesado_label_object.get('name'))
     revisar_label_id=get_label_id(gmail_service, revisar_label_object.get('name'))
     

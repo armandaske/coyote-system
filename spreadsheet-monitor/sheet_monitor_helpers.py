@@ -467,7 +467,11 @@ def update_calendar_and_folder(drive_service,sheets_service,calendar_service, fi
             del result_first_sheet
         
         values_first_sheet = make_square_matrix(values_first_sheet)
-
+        
+    except Exception as e:
+        print("Event was not updated. File doesn't have sheets 'ITINERARIO'",str(e))
+        return
+    try:
         # second worksheet extraction from file
         second_sheet_title = 'VIAJEROS'
         range_second_sheet = second_sheet_title + str(getenv('VIAJEROS_RANGE'))
@@ -476,7 +480,7 @@ def update_calendar_and_folder(drive_service,sheets_service,calendar_service, fi
         del result_second_sheet
         values_second_sheet = make_square_matrix(values_second_sheet)
     except Exception as e:
-        print("Event was not updated. File doesn't have sheets 'ITINERARIO' o 'VIAJEROS'",str(e))
+        print("Event was not updated. File doesn't have sheets 'VIAJEROS'",str(e))
         return
     
     if not values_first_sheet:

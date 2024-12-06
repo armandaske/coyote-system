@@ -1,7 +1,7 @@
 from flask import Flask, redirect, request, url_for, g
 from google_api_helpers import get_creds, get_oauth2_flow
 from googleapiclient.discovery import build
-from email_scraper import mail_scraper_main
+from email_scraper import email_scraper_main
 from firebase_admin import credentials, firestore, initialize_app
 from os import getenv
 import threading
@@ -107,15 +107,15 @@ def pubsub_handler(gmail_service,drive_service,sheets_service,payload):
     print(f"Received message: {payload}")
     locked2=False
     try:
-        mail_scraper_main(drive_service, sheets_service, gmail_service)
-        print('finished mail_scraper routine')
+        email_scraper_main(drive_service, sheets_service, gmail_service)
+        print('finished email_scraper routine')
         doc = firestore_db.collection('locks').document('pubsub-lock')
         snapshot=doc.get()
         locked2=snapshot.to_dict().get('locked2')
     finally:
         print('releasing lock')
         release_lock()
-        if locked2: #There's a pending change in gmail that occurred during the first processing. Will ping the pubsub-endpoint to run the mail_scraper routine again
+        if locked2: #There's a pending change in gmail that occurred during the first processing. Will ping the pubsub-endpoint to run the email_scraper routine again
             payload = {'message': 'new endpoint call from my app'}
             headers = {'Content-Type': 'application/json'}
             requests.post(URL+'/pubsub-endpoint',json=payload, headers=headers)
