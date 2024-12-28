@@ -279,9 +279,9 @@ def find_existing_file(drive_service, file_name, folder_id, second_search=False)
         return    
     
     if second_search:
-        final_list = [elem.get('id', '') for elem in files if (file_name.lower() in elem.get('name', '').lower() and 'privado' not in elem.get('name', '').lower()) or file_name.lower()==elem.get('name', '').lower()]
+        final_list = [elem.get('id', '') for elem in files if (file_name.lower() in elem.get('name', '').lower() or file_name.lower()==elem.get('name', '').lower())]
     elif at_none_in_name:
-        final_list = [elem.get('id', '') for elem in files if 'privado' not in elem.get('name', '').lower()]
+        final_list = [elem.get('id', '') for elem in files if 'privado' not in elem.get('name', '').lower()] #Este caso es para airbnb so no debería de llevar privado en el nombre por eso dejo esta condicion
     else:        
         final_list= [elem.get('id','') for elem in files if file_name in elem.get('name','')]
     if len(final_list)==0:
@@ -845,6 +845,9 @@ def fh_extract_booking_info(soup):
         email=''
 
     # Extract number_of_guests. Locate the <div> element containing the number of clients and the string "General Ticket" at the beginning of the mail
+    is_private_tour= soup.find('div', string=re.compile("PRIVATE TOUR|PRIVATE GROUP", re.IGNORECASE))
+    if is_private_tour:
+        experience_name+=' PRIVADO'
     number_of_guests_section = soup.find('div', string=re.compile("General Ticket|Private Group", re.IGNORECASE))
     # Extract the number from the text content
     if number_of_guests_section:
@@ -992,6 +995,9 @@ def fh_extract_rebooking_info(soup):
     else:
         print('Table with rebooking information not found')
         return
+    is_private_tour= soup.find('div', string=re.compile("PRIVATE TOUR|PRIVATE GROUP", re.IGNORECASE))
+    if is_private_tour:
+        experience_name+=' PRIVADO'
 
     results_dict={
         "sales_channel": 'Fareharbor',
@@ -1217,6 +1223,10 @@ def fh_extract_cancellation_info(soup):
     experience_name=experience_string.get_text(strip=True) if experience_string else 'Sin nombre'     
     date_raw = date_string.strip() if date_string else ''
     start_date, start_hour, end_date, end_hour = fh_extract_date_time(date_raw)
+    
+    is_private_tour= soup.find('div', string=re.compile("PRIVATE TOUR|PRIVATE GROUP", re.IGNORECASE))
+    if is_private_tour:
+        experience_name+=' PRIVADO'
     
     # Extract names_of_guests and ages from the correct table
     details_h2 = soup.find('h2', string="Details")
