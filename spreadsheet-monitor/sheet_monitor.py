@@ -34,7 +34,7 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
         for change in response.get('changes',[]):
             if last_processed_change_time:
                 if datetime.fromisoformat(change['time'][:-1])<= datetime.fromisoformat(last_processed_change_time[:-1]):
-                    # Skip changes that have already been processed
+                    print('Skip changes that have already been processed')
                     continue
             if (change['changeType'] == 'file' and 'file' in change and change['file'].get('mimeType')== 'application/vnd.google-apps.spreadsheet'):
                 # Process change
