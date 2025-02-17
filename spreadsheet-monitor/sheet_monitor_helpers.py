@@ -30,8 +30,11 @@ def get_clientes(mi_serie):
                        # yield (f'\n-{employers_uppercase}-\n')
                         for client in a:
                             if client:
-                                yield (f'{count+1}. {client}\n')
-                                count+=1
+                                if i=='VIAJAN ✅':
+                                    yield (f'{count+1}. {client}\n')
+                                    count+=1
+                                else:
+                                    yield (f'{client}\n')
                     else:
                         continue
     return
@@ -208,143 +211,151 @@ def get_tabs(sheets_service, file_id, keyword):
     return (tabs_names,tabs_ids)
 
 
-def create_calendar(drive_service,sheets_service,calendar_service,file_id,file_name, tab_name):
+def create_calendar(drive_service, sheets_service, calendar_service, file_id, file_name, tab_name):
     try:
-        # first worksheet extraction from file
-        first_sheet_title = tab_name
-        range_first_sheet = first_sheet_title + str(getenv('ITINERARIO_RANGE'))
-        result_first_sheet = sheets_service.spreadsheets().values().get(spreadsheetId=file_id, range=range_first_sheet).execute()
-        values_first_sheet = result_first_sheet.get('values', [])
-        del result_first_sheet
-        
-        # Check if the value in cell A1 is equal to 'Guia principal' to distinguish if using old or new version of hojas logisticas
-        if not values_first_sheet or not values_first_sheet[0] or values_first_sheet[0][0] != 'Guia principal':
-            # first worksheet extraction from file
-            first_sheet_title = tab_name
-            range_first_sheet = first_sheet_title + str(getenv('NEW_ITINERARIO_RANGE'))
-            result_first_sheet = sheets_service.spreadsheets().values().get(spreadsheetId=file_id, range=range_first_sheet).execute()
-            values_first_sheet = result_first_sheet.get('values', [])
-            del result_first_sheet
-            
-        values_first_sheet = make_square_matrix(values_first_sheet)
+        # Use batchGet to fetch ranges from the same spreadsheet at once:
+        ranges = [
+            f"{tab_name}{getenv('ITINERARIO_RANGE')}",
+            f"{tab_name}{getenv('NEW_ITINERARIO_RANGE')}",
+            f"VIAJEROS{getenv('VIAJEROS_RANGE')}"
+        ]
+        batch_response = sheets_service.spreadsheets().values().batchGet(
+            spreadsheetId=file_id, ranges=ranges
+        ).execute()
 
-        # second worksheet extraction from file
-        second_sheet_title = 'VIAJEROS'
-        range_second_sheet = second_sheet_title + str(getenv('VIAJEROS_RANGE'))
-        result_second_sheet = sheets_service.spreadsheets().values().get(spreadsheetId=file_id, range=range_second_sheet).execute()
-        values_second_sheet = result_second_sheet.get('values', [])
-        del result_second_sheet
+        # The first two ranges correspond to ITINERARIO (old and new version)
+        values_first_sheet = batch_response['valueRanges'][0].get('values', [])
+        values_new_sheet = batch_response['valueRanges'][1].get('values', [])
+        # The third range corresponds to VIAJEROS
+        values_second_sheet = batch_response['valueRanges'][2].get('values', [])
+        
+        # Decide which ITINERARIO range to use based on cell A1
+        if not values_first_sheet or not values_first_sheet[0] or values_first_sheet[0][0] != 'Guia principal':
+            values_first_sheet = values_new_sheet
+
+        if not values_first_sheet:
+            print(f'Event was not created. No data found in {tab_name}.')
+            return (None, None)
+        if not values_second_sheet:
+            print("Event was not created. No data found in VIAJEROS.")
+            return (None, None)
+        
+        # Ensure the matrices are square
+        values_first_sheet = make_square_matrix(values_first_sheet)
         values_second_sheet = make_square_matrix(values_second_sheet)
+        
     except Exception as e:
-        print("Event was not created. File doesn't have sheets 'ITINERARIO' o 'VIAJEROS'",str(e))
+        print("Event was not created. File doesn't have sheets 'ITINERARIO' o 'VIAJEROS':", str(e))
         return (None, None)
     
-    if not values_first_sheet:
-        print(f'Event was not created. No data found in {first_sheet_title}.')
-        return (None, None)
-    if not values_second_sheet:
-        print(f'Event was not created. No data found in {second_sheet_title}.')
-        return (None, None)
-    
-    #Get info from Sheet document
-    first_sheet_df=DataFrame(values_first_sheet[1:],columns=values_first_sheet[0])
-    first_sheet_df=first_sheet_df.applymap(lambda x:x.strip() if type(x)==str else x)
-    
-    second_sheet_df=DataFrame(values_second_sheet[1:],columns=values_second_sheet[0])
-    second_sheet_df=second_sheet_df.applymap(lambda x:x.strip() if type(x)==str else x)
-    
-    # check if start date is in the future
+    # Convert fetched data to pandas DataFrames and clean string values
     try:
-        if not first_sheet_df.loc[0,'Hora de inicio']:       
-            first_sheet_df.loc[0,'Hora de inicio']='06:00' #Si no tiene hora de inicio es esta por default
-        date_time_start= first_sheet_df.loc[0,'Fecha de inicio']+'T'+first_sheet_df.loc[0,'Hora de inicio']+':00'
-        if not first_sheet_df.loc[0,'Hora de fin']:
-            first_sheet_df.loc[0,'Hora de fin']='18:00' 
-        date_time_end=first_sheet_df.loc[0,'Fecha de fin']+'T'+first_sheet_df.loc[0,'Hora de fin']+':00'
+        first_sheet_df = DataFrame(values_first_sheet[1:], columns=values_first_sheet[0])
+        first_sheet_df = first_sheet_df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+        second_sheet_df = DataFrame(values_second_sheet[1:], columns=values_second_sheet[0])
+        second_sheet_df = second_sheet_df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
     except Exception as e:
-        print("Event was not created. There's a problem with the start or end date:",str(e))
+        print("Error processing sheet data:", str(e))
         return (None, None)
-    if seconds_since(date_time_start,False)>=0: #Event set in the past THIS HAS TO BE 0 BECAUSE IT IS CREATING THE EVENT
+    
+    # Validate and format start and end dates
+    try:
+        if not first_sheet_df.loc[0, 'Hora de inicio']:
+            first_sheet_df.loc[0, 'Hora de inicio'] = '06:00'
+        date_time_start = first_sheet_df.loc[0, 'Fecha de inicio'] + 'T' + first_sheet_df.loc[0, 'Hora de inicio'] + ':00'
+        if not first_sheet_df.loc[0, 'Hora de fin']:
+            first_sheet_df.loc[0, 'Hora de fin'] = '18:00'
+        date_time_end = first_sheet_df.loc[0, 'Fecha de fin'] + 'T' + first_sheet_df.loc[0, 'Hora de fin'] + ':00'
+    except Exception as e:
+        print("Event was not created. There's a problem with the start or end date:", str(e))
+        return (None, None)
+    
+    # Ensure the event is set in the future (seconds_since() must return 0 for a valid future event)
+    if seconds_since(date_time_start, False) >= 0:
         print("Start date is set in the past")
         return (None, None)
     
-    # if event in the future, set variables for calendar event
-    try: 
-        summary= first_sheet_df.loc[0,'Tour']
+    # Extract event details from the ITINERARIO sheet
+    try:
+        summary = first_sheet_df.loc[0, 'Tour']
         guia = first_sheet_df.loc[0, 'Guia principal']
         apoyo = list_to_str_commas(first_sheet_df.loc[:, 'Guia apoyo'])
-        chofer= first_sheet_df.loc[0,'Chofer']
-        
-        staff=set(concat([Series(guia),first_sheet_df['Guia apoyo'],Series(chofer)]).reset_index(drop=True))  #get non-repeatead elements from the concatenated Series
-        
-        atendees=get_emails(sheets_service, staff)
-        transporte=first_sheet_df.loc[0,'Transporte']
-        comentarios=first_sheet_df.loc[0,'Comentarios']
+        chofer = first_sheet_df.loc[0, 'Chofer']
+        staff = set(concat([Series(guia), first_sheet_df['Guia apoyo'], Series(chofer)]).reset_index(drop=True))
+        atendees = get_emails(sheets_service, staff)
+        transporte = first_sheet_df.loc[0, 'Transporte']
+        comentarios = first_sheet_df.loc[0, 'Comentarios']
         logistica = first_sheet_df.loc[0, 'Logistica']
-        avisos=first_sheet_df.loc[0,'Avisos'] 
-        renta_bicis = first_sheet_df.loc[0, 'Renta de bicis'] if 'Renta de bicis' in first_sheet_df.columns else None #Es importante que aquí renta_bicis tenga el valor de None y sólo lo pueda adquirir aquí
+        avisos = first_sheet_df.loc[0, 'Avisos']
+        # Retain renta_bicis logic
+        renta_bicis = first_sheet_df.loc[0, 'Renta de bicis'] if 'Renta de bicis' in first_sheet_df.columns else None
         del first_sheet_df
-        
     except Exception as e:
-        print("Event was not created. There's a problem with the sheet ITINERARIO:",str(e))
+        print("Event was not created. There's a problem with the sheet ITINERARIO:", str(e))
         return (None, None)
     
+    # Process the VIAJEROS sheet for client status information
     try:
         second_sheet_df['STATUS'] = second_sheet_df['STATUS'].fillna('VIAJAN ✅')
         second_sheet_df['PUNTO DE VENTA'] = second_sheet_df['PUNTO DE VENTA'].fillna('OTRO')
-
-
-        # Map REBOOKED and CANCELADO to NO VIAJAN
-        second_sheet_df['STATUS'] = second_sheet_df['STATUS'].replace({'RESERVADO✅':'VIAJAN ✅','REBOOKED⚠️': 'NO VIAJAN 🚫', 'CANCELADO🚫': 'NO VIAJAN 🚫'})
+        # Map statuses
+        second_sheet_df['STATUS'] = second_sheet_df['STATUS'].replace({
+            'RESERVADO✅': 'VIAJAN ✅',
+            'REBOOKED⚠️': 'NO VIAJAN 🚫',
+            'CANCELADO🚫': 'NO VIAJAN 🚫'
+        })
         second_sheet_df = second_sheet_df.sort_values(by='STATUS')
-        clientes_by_status = second_sheet_df.groupby(['STATUS','PUNTO DE VENTA'])['NOMBRE'].apply(list)
-        clientes_by_status = clientes_by_status.sort_index(level='STATUS',ascending=False)
+        clientes_by_status = second_sheet_df.groupby(['STATUS', 'PUNTO DE VENTA'])['NOMBRE'].apply(list)
+        clientes_by_status = clientes_by_status.sort_index(level='STATUS', ascending=False)
         del second_sheet_df
         clientes = get_clientes(clientes_by_status)
-        
     except Exception as e:
-        print("Event was not created. There's a problem with the sheet VIAJEROS:",str(e))
+        print("Event was not created. There's a problem with the sheet VIAJEROS:", str(e))
         return (None, None)
     
-    #Get the big text for the description of the event, first the clients
-    description=''
-    for i in clientes:
-        description+=i
-              
-    if renta_bicis is None:
-        if 'street art' in file_name.lower() and guia!='❌' and guia!='' and logistica=='✅':
-            color= '2' #verde
-        
-        elif (guia!='❌' and guia!='') and (chofer!='❌' and chofer!='')\
-        and (transporte!='❌' and transporte!='') and avisos=='✅' and logistica=='✅' :
-            color='2' #verde
-        
-        elif (guia=='❌' or guia=='') and (chofer=='❌' or chofer=='')\
-        and (transporte=='❌' or transporte=='') and (avisos=='❌' or avisos=='') and (logistica=='❌' or logistica=='') :
-            color='6' #rojo
-        
-        else:
-            color='5' #amarillo
-        description+=f'\nComentarios:\n{comentarios}\n\nGuía: {guia}\nGuía de apoyo: {apoyo}\nChofer: {chofer}\nTransporte: {transporte}\nLogística: {logistica}\nAvisos: {avisos}'
-    else:
-        if 'street art' in file_name.lower() and guia!='❌' and guia!='' and logistica=='✅' and renta_bicis=='✅':
-            color= '2' #verde
-        
-        elif (guia!='❌' and guia!='') and (chofer!='❌' and chofer!='')\
-        and (transporte!='❌' and transporte!='') and avisos=='✅' and logistica=='✅' and renta_bicis=='✅':
-            color='2' #verde
-        
-        elif (guia=='❌' or guia=='') and (chofer=='❌' or chofer=='')\
-        and (transporte=='❌' or transporte=='') and (avisos=='❌' or avisos=='') and (logistica=='❌' or logistica=='') and (renta_bicis=='❌' or renta_bicis==''):
-            color='6' #rojo
-        
-        else:
-            color='5' #amarillo
-        description+=f'\nComentarios:\n{comentarios}\n\nGuía: {guia}\nGuía de apoyo: {apoyo}\nChofer: {chofer}\nTransporte: {transporte}\nLogística: {logistica}\nAvisos: {avisos}\nRenta de bicis: {renta_bicis}'
-
+    # Build the description text using client data and event details
+    description = ' '
+    for cliente_text in clientes:
+        description += cliente_text
     
-    #Create event    
-    file_metadata = drive_service.files().get(fileId=file_id, fields='mimeType, webViewLink').execute()
+    # Determine event color and append extra comments
+    if renta_bicis is None:
+        if 'street art' in file_name.lower() and guia != '❌' and guia != '' and logistica == '✅':
+            color = '2'  # verde
+        elif (guia != '❌' and guia != '') and (chofer != '❌' and chofer != '') \
+                and (transporte != '❌' and transporte != '') and avisos == '✅' and logistica == '✅':
+            color = '2'  # verde
+        elif (guia == '❌' or guia == '') and (chofer == '❌' or chofer == '') \
+                and (transporte == '❌' or transporte == '') and (avisos == '❌' or avisos == '') \
+                and (logistica == '❌' or logistica == ''):
+            color = '6'  # rojo
+        else:
+            color = '5'  # amarillo
+        description += f'\nComentarios:\n{comentarios}\n\nGuía: {guia}\nGuía de apoyo: {apoyo}\nChofer: {chofer}\nTransporte: {transporte}\nLogística: {logistica}\nAvisos: {avisos}'
+    else:
+        if 'street art' in file_name.lower() and guia != '❌' and guia != '' and logistica == '✅' and renta_bicis == '✅':
+            color = '2'  # verde
+        elif (guia != '❌' and guia != '') and (chofer != '❌' and chofer != '') \
+                and (transporte != '❌' and transporte != '') and avisos == '✅' and logistica == '✅' and renta_bicis == '✅':
+            color = '2'  # verde
+        elif (guia == '❌' or guia == '') and (chofer == '❌' or chofer == '') \
+                and (transporte == '❌' or transporte == '') and (avisos == '❌' or avisos == '') \
+                and (logistica == '❌' or logistica == '') and (renta_bicis == '❌' or renta_bicis == ''):
+            color = '6'  # rojo
+        else:
+            color = '5'  # amarillo
+        description += f'\nComentarios:\n{comentarios}\n\nGuía: {guia}\nGuía de apoyo: {apoyo}\nChofer: {chofer}\nTransporte: {transporte}\nLogística: {logistica}\nAvisos: {avisos}\nRenta de bicis: {renta_bicis}'
+
+    # Get file metadata in one call
+    try:
+        file_metadata = drive_service.files().get(
+            fileId=file_id, fields='mimeType, webViewLink'
+        ).execute()
+    except Exception as e:
+        print("Error fetching file metadata:", str(e))
+        return (None, None)
+    
+    # Construct the calendar event object
     event = {
         'summary': summary,
         'location': 'C. Macedonio Alcalá 802, RUTA INDEPENDENCIA, Centro, 68000 Oaxaca de Juárez, Oax.',
@@ -352,36 +363,35 @@ def create_calendar(drive_service,sheets_service,calendar_service,file_id,file_n
         'colorId': color,
         'start': {
             'dateTime': date_time_start,
-            'timeZone': 'America/Mexico_City', 
+            'timeZone': 'America/Mexico_City',
         },
         'end': {
             'dateTime': date_time_end,
-            'timeZone': 'America/Mexico_City',  
+            'timeZone': 'America/Mexico_City',
         },
-        'attendees': [
-            {'email': attendee} for attendee in atendees if attendee
-        ],
-        'reminders': {
-            'useDefault': True,
-        },
-        'attachments':[
+        'attendees': [{'email': attendee} for attendee in atendees if attendee],
+        'reminders': {'useDefault': True},
+        'attachments': [
             {
                 'fileUrl': file_metadata.get('webViewLink'),
                 'mimeType': file_metadata.get('mimeType'),
                 'title': file_name
             }
-        ]      
+        ]
     }
     
     try:
-        created_event=calendar_service.events().insert(calendarId='primary', sendUpdates='all', body=event, supportsAttachments=True).execute()
+        created_event = calendar_service.events().insert(
+            calendarId='primary', sendUpdates='all', body=event, supportsAttachments=True
+        ).execute()
     except errors.HttpError as e:
-        print('Event not created, an error has occured:',str(e))
+        print('Event not created, an error occurred:', str(e))
         return (None, None)
-    calendar_id=created_event['id']
-    calendar_link=created_event['htmlLink']
-    print(f'Event created succesfully! ID:{calendar_id}')
-    return (calendar_id,calendar_link)
+    
+    calendar_id = created_event['id']
+    calendar_link = created_event['htmlLink']
+    print(f'Event created successfully! ID: {calendar_id}')
+    return (calendar_id, calendar_link)
 
 def create_photos_folder(drive_service,file_name):
     #CREATE THE FOLDER FOR THE PHOTOS OF THIS EXPERIENCE WITH THE SAME NAME AS THE SHEETS FILE
