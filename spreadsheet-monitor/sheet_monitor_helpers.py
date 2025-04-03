@@ -1,10 +1,13 @@
 import googleapiclient.errors as errors
+import logging
 from datetime import datetime
 from os import getenv
 import re
 EMAIL_FILE_ID= str(getenv('EMAIL_FILE_ID'))
 LOG_FILE_ID= str(getenv('LOG_FILE_ID'))
 SECONDS_THRESHOLD_UPDATE = int(getenv('SECONDS_THRESHOLD_UPDATE'))
+
+logging.basicConfig(level=logging.INFO)
 
 def make_file_public(drive_service,file_id,role):
     try:
@@ -692,17 +695,48 @@ def get_emails(sheets_service, staff):
         print('An error has occured getting the emails of the staff:',str(e))
     return(mails)
 
-def delete_calendar_and_folder(drive_service, calendar_service,calendar_id, folder_id):
-    try:
-        calendar_service.events().delete(calendarId='primary', eventId=calendar_id).execute()
-        print(f"Deleted event with ID: {calendar_id}")
-    except:
-        print(f'error trying to delete calendar event {calendar_id}')
-    try:
-        drive_service.files().delete(fileId=folder_id).execute()
-        print(f"Deleted photos folder with ID: {folder_id}")
-    except:
-        print(f'error trying to delete photos folder ID: {folder_id}')
+# Callback function to handle responses from batch requests
+def batch_delete_callback(request_id, response, exception):
+    if exception:
+        logging.error(f"Error in request {request_id}: {exception}, Response: {response}")
+    else:
+        logging.info(f"Successfully processed request {request_id}, Response: {response}")
+
+# Function to delete multiple calendar events in batch
+def batch_delete_calendar_events(calendar_service, calendar_ids):
+    batch = calendar_service.new_batch_http_request(callback=batch_delete_callback)
+    
+    for event_id in calendar_ids:
+        batch.add(calendar_service.events().delete(calendarId="primary", eventId=event_id))
+    
+    batch.execute()
+
+# Function to delete multiple folders from Google Drive in batch
+def batch_delete_drive_folders(drive_service, folder_ids):
+    batch = drive_service.new_batch_http_request(callback=batch_delete_callback)
+    
+    for folder_id in folder_ids:
+        batch.add(drive_service.files().delete(fileId=folder_id))
+    
+    batch.execute()
+
+# Main function to delete calendar events and folders in batch
+def delete_calendar_and_folders_batch(drive_service, calendar_service, calendar_ids, folder_ids):
+    # Delete calendar events in batch
+    if calendar_ids:
+        logging.info(f"Starting to delete {len(calendar_ids)} calendar events.")
+        batch_delete_calendar_events(calendar_service, calendar_ids)
+    else:
+        logging.warning(f"No calendar events to delete")
+        
+    
+    # Delete folders in batch
+    if folder_ids:
+        logging.info(f"Starting to delete {len(folder_ids)} folders.")
+        batch_delete_drive_folders(drive_service, folder_ids)
+    else:
+        logging.warning(f"No photo folders to delete")
+
 
 def make_square_matrix(matrix):
     if len(matrix)>0:

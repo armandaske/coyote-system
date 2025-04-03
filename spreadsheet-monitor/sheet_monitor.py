@@ -1,5 +1,5 @@
 def main_function(drive_service, sheets_service, calendar_service, firestore_db):
-    from sheet_monitor_helpers import get_last_state, get_month_from_file_name, get_year_from_file_name, find_last_subfolder_id, delete_logs, delete_calendar_and_folder,\
+    from sheet_monitor_helpers import get_last_state, get_month_from_file_name, get_year_from_file_name, find_last_subfolder_id, delete_logs, delete_calendar_and_folders_batch,\
         update_calendar_and_folder, update_logs, inspect_logs, create_logs, create_calendar, create_photos_folder, attach_folder_to_calendar, make_file_public, store_state,\
         get_tabs
     import googleapiclient.errors as errors
@@ -70,8 +70,7 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                     if file_metadata.get('trashed','') or ROOT_ID in file_parents or not file_parents: #When other user deletes the file, it goes to the trash bin
                         print('The file was deleted. Deleting calendar event, photos folder and logs')
                         calendar_ids,photos_folder_ids= delete_logs(sheets_service,file_id)
-                        for i in range(len(calendar_ids)): 
-                            delete_calendar_and_folder(drive_service, calendar_service,calendar_ids[i], photos_folder_ids[i])
+                        delete_calendar_and_folders_batch(drive_service, calendar_service,calendar_ids, photos_folder_ids)
                     else:
                         tabs_names,tabs_ids=get_tabs(sheets_service, file_id, 'ITINERARIO')
                         for i in range(len(tabs_ids)):

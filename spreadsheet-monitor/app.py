@@ -22,9 +22,9 @@ def home():
     if not creds or not creds.valid:
         return redirect(url_for('authorize'))
     # Build services here
-    drive_service = build('drive', 'v3', credentials=creds)
-    sheets_service = build('sheets', 'v4', credentials=creds)
-    calendar_service = build('calendar', 'v3', credentials=creds)
+    drive_service = build('drive', 'v3', credentials=creds, cache_discovery=False)
+    sheets_service = build('sheets', 'v4', credentials=creds, cache_discovery=False)
+    calendar_service = build('calendar', 'v3', credentials=creds, cache_discovery=False)
     # Run main function when i print i can see it in the sdk shell or the terminal, but if i return, it displays on the browser 
     try:
         main_function(drive_service, sheets_service, calendar_service, firestore_db)  # Pass the Firestore client to the main function
