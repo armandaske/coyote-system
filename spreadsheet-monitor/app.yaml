@@ -12,5 +12,6 @@ env_variables:
   EMAILS_RANGE: "!A2:B50"
   PROJECT_ID: "640474142702" # It was supposed to be the ID but I changed to project number and it worked
   SECRET_ID: "coyote_workflow_webclient_secret" #Coyote
-  LOG_FILE_ID: "1OZAM8SeHwucAFNJjwEgzXBCRGGRVwLKYsmLe5X51V48" #Coyote
-  ROOT_ID: "0ABvJcEQYHcHsUk9PVA"#Coyote
+  LOG_FILE_ID: "1K-3zPuIOaePR0A1qjKf_kYJulsn-xxsd7KdvMReYAtA" #Coyote
+  EMAIL_FILE_ID: "1OZAM8SeHwucAFNJjwEgzXBCRGGRVwLKYsmLe5X51V48" #Coyote
+  ROOT_ID: "0ABvJcEQYHcHsUk9PVA" #Coyote

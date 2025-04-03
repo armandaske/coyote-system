@@ -2,6 +2,7 @@ import googleapiclient.errors as errors
 from datetime import datetime
 from os import getenv
 import re
+EMAIL_FILE_ID= str(getenv('EMAIL_FILE_ID'))
 LOG_FILE_ID= str(getenv('LOG_FILE_ID'))
 SECONDS_THRESHOLD_UPDATE = int(getenv('SECONDS_THRESHOLD_UPDATE'))
 
@@ -134,63 +135,52 @@ def inspect_logs(sheets_service,file_id,tab_id, file_name, tab_name):
     return (calendar_id, folder_id, folder_link)
   
     
-def delete_logs(sheets_service,file_id):
-    sheet_name='logs'
-    data_range = f'{sheet_name}!A:I'
+def delete_logs(sheets_service, file_id):
+    sheet_name = 'logs'
+    data_range = f'{sheet_name}!A:S'
 
-    spreadsheet = sheets_service.spreadsheets().get(spreadsheetId=LOG_FILE_ID).execute()
-    sheets = spreadsheet.get('sheets', '')
-    sheetId = None
-    for sheet in sheets:
-        if sheet.get('properties', {}).get('title') == sheet_name:
-            sheetId = sheet.get('properties', {}).get('sheetId')
-            break    
+    # Get only the required data, skipping the spreadsheet metadata request
     result = sheets_service.spreadsheets().values().get(spreadsheetId=LOG_FILE_ID, range=data_range).execute()
     values = result.get('values', [])
-    del result
-    
-    search_string = file_id 
 
-    # Iterate over the rows
-    calendar_ids=[]
-    folder_ids=[]
-    #for i, row in enumerate(values):
-    i=0
-    j=0
-    while i < len(values):
-        row=values[i]
-        # If the search string is found in column B (index 0)
+    search_string = file_id
+    rows_to_delete = []
+    calendar_ids = []
+    folder_ids = []
+
+    # Collect indices of rows to delete
+    for i, row in enumerate(values):
         if row and row[1] == search_string:
-            calendar_id=row[2]
-            folder_id=row[3]
-                    
-            # Delete the row
-            request = sheets_service.spreadsheets().batchUpdate(
-                spreadsheetId=LOG_FILE_ID,
-                body={
-                    "requests": [
-                        {
-                            "deleteDimension": {
-                                "range": {
-                                    "sheetId": sheetId,
-                                    "dimension": "ROWS",
-                                    "startIndex": j,
-                                    "endIndex": j + 1
-                                }
-                            }
-                        }
-                    ]
+            calendar_ids.append(row[2])
+            folder_ids.append(row[3])
+            rows_to_delete.append(i)  # Collect indices to delete later
+
+    if not rows_to_delete:
+        print(f"No matching rows found for {search_string}")
+        return (calendar_ids, folder_ids)
+
+    # Prepare batch delete request (reverse order to prevent shifting issues)
+    delete_requests = [
+        {
+            "deleteDimension": {
+                "range": {
+                    "sheetId": 0,  # Sheet ID is often 0 for the first sheet; confirm if needed
+                    "dimension": "ROWS",
+                    "startIndex": i,
+                    "endIndex": i + 1
                 }
-            )
-            request.execute()
-            #Aqui tal vez poner un if request: para asegurarme que sí borró esa madre
-            print(f"Deleted row {i + 1} in {sheet_name}")
-            calendar_ids.append(calendar_id)
-            folder_ids.append(folder_id)
-        else:
-            j+=1
-        i+=1
-    del values
+            }
+        }
+        for i in sorted(rows_to_delete, reverse=True)
+    ]
+
+    # Execute batch delete request
+    sheets_service.spreadsheets().batchUpdate(
+        spreadsheetId=LOG_FILE_ID,
+        body={"requests": delete_requests}
+    ).execute()
+
+    print(f"Deleted {len(rows_to_delete)} rows in {sheet_name}")
     return (calendar_ids, folder_ids)
 
 def get_tabs(sheets_service, file_id, keyword):
@@ -679,7 +669,7 @@ def get_emails(sheets_service, staff):
     data_range = sheet_name+str(getenv('EMAILS_RANGE'))
      # Read the data from the sheet
     try:
-        result = sheets_service.spreadsheets().values().get(spreadsheetId=LOG_FILE_ID,range=data_range).execute()
+        result = sheets_service.spreadsheets().values().get(spreadsheetId=EMAIL_FILE_ID,range=data_range).execute()
         # Get the values from the result
         values = result.get('values', [])
         del result
