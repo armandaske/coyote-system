@@ -1,4 +1,3 @@
-from pandas import DataFrame, concat, Series
 import googleapiclient.errors as errors
 from datetime import datetime
 from os import getenv
@@ -212,6 +211,8 @@ def get_tabs(sheets_service, file_id, keyword):
 
 
 def create_calendar(drive_service, sheets_service, calendar_service, file_id, file_name, tab_name):
+    from pandas import DataFrame, concat, Series
+
     try:
         # Use batchGet to fetch ranges from the same spreadsheet at once:
         ranges = [
@@ -459,6 +460,8 @@ def attach_folder_to_calendar(calendar_service, calendar_id,folder_link,file_nam
 
         
 def update_calendar_and_folder(drive_service,sheets_service,calendar_service, file_id, calendar_id, folder_id, file_name, tab_name, folder_link):    
+    from pandas import DataFrame, concat, Series
+
     try:
         # first worksheet extraction from file
         first_sheet_title = tab_name
