@@ -37,12 +37,13 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                     print('Skip changes that have already been processed')
                     continue
             if (change['changeType'] == 'file' and 'file' in change and change['file'].get('mimeType')== 'application/vnd.google-apps.spreadsheet'):
-                # Process change
+                # the change is in a sheets file
                 file = change.get('file')
                 file_name=file.get('name')
                 file_month=get_month_from_file_name(file_name)
                 file_year=get_year_from_file_name(file_name)
                 
+                #check if the file is in the right folder
                 file_id=file.get('id')
                 file_metadata = drive_service.files().get(fileId=file_id, fields='webViewLink, trashed, parents').execute()
                 file_parents=file_metadata.get('parents',[])
@@ -64,6 +65,7 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
 
 
                 if is_child:
+                    #It is a sheet file inside the correct folder (hoja logística)
                     print(f"Change detected for file: {file_name}, ID: {file_id}")          
                     file_link = file_metadata.get('webViewLink','')
 
@@ -71,11 +73,14 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                         print('The file was deleted. Deleting calendar event, photos folder and logs')
                         calendar_ids,photos_folder_ids= delete_logs(sheets_service,file_id)
                         delete_calendar_and_folders_batch(drive_service, calendar_service,calendar_ids, photos_folder_ids)
+                    
                     else:
+                        #The file was modified or recently created
                         tabs_names,tabs_ids=get_tabs(sheets_service, file_id, 'ITINERARIO')
                         for i in range(len(tabs_ids)):
                             calendar_id, photos_folder_id, photos_folder_link=inspect_logs(sheets_service,file_id,tabs_ids[i],file_name,tabs_names[i])#this also updates the name of the file and tab in the logs
                             if calendar_id:
+                                #ya se había hecho un calendar event y está en los logs esta tab de la hoja logísitica
                                 print('Updating the calendar event and photos folder')
                                 if not photos_folder_id:
                                     photos_folder_id, photos_folder_link = create_photos_folder(drive_service,file_name) if len(tabs_ids)==1 else create_photos_folder(drive_service,file_name+' '+tabs_names[i]) #sheets que no son multiday no llevan sufijo en el nombre
@@ -84,6 +89,7 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                                 update_calendar_and_folder(drive_service,sheets_service,calendar_service,file_id, calendar_id, photos_folder_id, file_name,tabs_names[i], photos_folder_link)
                                 
                             else:
+                                #Es una nueva hojalogística o un nuevo tab de itinerario
                                 print('Creating a calendar event and photos folder for this experience')
                                 calendar_id,calendar_link = create_calendar(drive_service,sheets_service,calendar_service,file_id, file_name, tabs_names[i])
                                 if calendar_id:

@@ -98,8 +98,9 @@ def update_logs(sheets_service,file_id, tab_id, update_values,columns):
     values = result.get('values', [])
     del result #just to freeup memory
 
-    # Go through each row to look for matches
-    for i,row in enumerate(values):
+    # Go through each row to look for matches. Start at the end for quicker find
+    for i in range(len(values) - 1, -1, -1):
+        row=values[i]
         if row and row[1] == file_id and str(row[8]) == tab_id:
             for update_value, column in zip(update_values, columns):
                 range_ = f"{sheet_name}!{column}{i+1}"
