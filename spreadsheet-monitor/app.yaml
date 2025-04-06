@@ -8,8 +8,9 @@ env_variables:
   SECONDS_THRESHOLD_UPDATE: 43200 #24hrs
   ITINERARIO_RANGE: "!A1:M6"
   NEW_ITINERARIO_RANGE: "!A4:M9"
-  VIAJEROS_RANGE: "!A1:R50"
+  VIAJEROS_RANGE: "!A1:K40"
   EMAILS_RANGE: "!A2:B50"
+  PAGOS_RANGE: "!B28:B38"
   PROJECT_ID: "640474142702" # It was supposed to be the ID but I changed to project number and it worked
   SECRET_ID: "coyote_workflow_webclient_secret" #Coyote
   LOG_FILE_ID: "1K-3zPuIOaePR0A1qjKf_kYJulsn-xxsd7KdvMReYAtA" #Coyote

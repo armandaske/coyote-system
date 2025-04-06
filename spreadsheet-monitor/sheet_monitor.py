@@ -1,7 +1,7 @@
 def main_function(drive_service, sheets_service, calendar_service, firestore_db):
     from sheet_monitor_helpers import get_last_state, get_month_from_file_name, get_year_from_file_name, find_last_subfolder_id, delete_logs, delete_calendar_and_folders_batch,\
         update_calendar_and_folder, update_logs, inspect_logs, create_logs, create_calendar, create_photos_folder, attach_folder_to_calendar, make_file_public, store_state,\
-        get_tabs
+        get_tabs, get_data_hl
     import googleapiclient.errors as errors
     from datetime import datetime
     from os import getenv
@@ -77,7 +77,17 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                     else:
                         #The file was modified or recently created
                         tabs_names,tabs_ids=get_tabs(sheets_service, file_id, 'ITINERARIO')
+                        multiday='NO'
+                        if len(tabs_ids)>1:
+                            multiday='SI'
                         for i in range(len(tabs_ids)):
+                            is_first_itinerario=True #Necesito saber si es el primer tab y poner pagos, gastos, etc
+                            if i>0:
+                                is_first_itinerario=False
+                            #logs_data, all_data=get_data_hl(sheets_service, file_id, tabs_names[i],is_first_itinerario, multiday)
+                            #if not logs_data:
+                            #    print(f'Error fetching data from tab {tabs_names[i]}')
+                            #    continue
                             calendar_id, photos_folder_id, photos_folder_link=inspect_logs(sheets_service,file_id,tabs_ids[i],file_name,tabs_names[i])#this also updates the name of the file and tab in the logs
                             if calendar_id:
                                 #ya se había hecho un calendar event y está en los logs esta tab de la hoja logísitica
@@ -89,7 +99,7 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                                 update_calendar_and_folder(drive_service,sheets_service,calendar_service,file_id, calendar_id, photos_folder_id, file_name,tabs_names[i], photos_folder_link)
                                 
                             else:
-                                #Es una nueva hojalogística o un nuevo tab de itinerario
+                                #Es una nueva hoja logística o un nuevo tab de itinerario
                                 print('Creating a calendar event and photos folder for this experience')
                                 calendar_id,calendar_link = create_calendar(drive_service,sheets_service,calendar_service,file_id, file_name, tabs_names[i])
                                 if calendar_id:

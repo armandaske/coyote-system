@@ -203,6 +203,125 @@ def get_tabs(sheets_service, file_id, keyword):
             tabs_ids.append(sheet_id)
     return (tabs_names,tabs_ids)
 
+def get_data_hl(sheets_service, file_id, tab_name,is_first_itinerario): 
+    #TODO:
+    #Hacer logica de que solo la primera tab registra pago y gastos y viajeros y multiday
+    #cambiar la logica de create y update logs. Tal vez lo mejor es encontrar existing records y sobreescribir el row entero, o escribir el row entero al final si no encontró record
+    from pandas import DataFrame, concat, Series
+
+    try:
+        # Fetch only ITINERARIO to check the date
+        first_sheet_range = f"{tab_name}{getenv('NEW_ITINERARIO_RANGE')}"
+        response = sheets_service.spreadsheets().values().get(
+            spreadsheetId=file_id, range=first_sheet_range
+        ).execute()
+
+        values_first_sheet = response.get('values', [])
+
+        if not values_first_sheet:
+            print(f'No data found in {tab_name}.')
+            return (None,None)
+        # Ensure matrix is square
+        values_first_sheet = make_square_matrix(values_first_sheet)
+    except Exception as e:
+        print("Error fetching data from sheets ITINERARIO:", str(e))
+        return (None,None)
+    try:
+        # Convert to DataFrame and clean
+        first_sheet_df = DataFrame(values_first_sheet[1:], columns=values_first_sheet[0])
+        first_sheet_df = first_sheet_df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+
+        # Validate and format start and end dates
+        if not first_sheet_df.loc[0, 'Hora de inicio']:
+            first_sheet_df.loc[0, 'Hora de inicio'] = '06:00'
+        date_time_start = first_sheet_df.loc[0, 'Fecha de inicio'] + 'T' + first_sheet_df.loc[0, 'Hora de inicio'] + ':00'
+        if not first_sheet_df.loc[0, 'Hora de fin']:
+            first_sheet_df.loc[0, 'Hora de fin'] = '18:00'
+        date_time_end = first_sheet_df.loc[0, 'Fecha de fin'] + 'T' + first_sheet_df.loc[0, 'Hora de fin'] + ':00'
+
+    except Exception as e:
+        print("There's a problem with the start or end date:", str(e))
+        return (None,None)
+
+    # Step 2: Skip if the event is in the past
+    if seconds_since(date_time_end, False) > SECONDS_THRESHOLD_UPDATE:
+        print("Start date is set in the past. Skipping event.")
+        return (None,None)
+         
+    try:
+        # Step 3: Fetch the remaining sheets since the event is valid
+        ranges = [
+            f"VIAJEROS{getenv('VIAJEROS_RANGE')}",
+            f"PAGOS{getenv('PAGOS_RANGE')}",
+        ]
+        batch_response = sheets_service.spreadsheets().values().batchGet(
+            spreadsheetId=file_id, ranges=ranges
+        ).execute()
+
+        values_second_sheet = batch_response['valueRanges'][0].get('values', [])
+        values_pagos_sheet = batch_response['valueRanges'][1].get('values', [])
+
+        if not values_second_sheet:
+            print("No data found in VIAJEROS.")
+            return (None,None)
+        if not values_pagos_sheet:
+            print("No data found in PAGOS.")
+            return (None,None)
+
+        values_second_sheet = make_square_matrix(values_second_sheet)
+        second_sheet_df = DataFrame(values_second_sheet[1:], columns=values_second_sheet[0])
+        second_sheet_df = second_sheet_df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+        pagos_sheet_df = DataFrame(values_pagos_sheet, columns=values_pagos_sheet[0])
+        pagos_sheet_df = pagos_sheet_df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    except Exception as e:
+        print("Error fetching data from sheets VIAJEROS or PAGOS:", str(e))
+        return (None,None)
+    
+    # Extract event details from the ITINERARIO sheet
+    all_data=[]
+    logs_data=[]
+
+    try:
+        tour_name = first_sheet_df.loc[0, 'Tour']
+        guia = first_sheet_df.loc[0, 'Guia principal']
+        apoyo = list_to_str_commas(first_sheet_df.loc[:, 'Guia apoyo'])
+        chofer = first_sheet_df.loc[0, 'Chofer']
+        staff = set(concat([Series(guia), first_sheet_df['Guia apoyo'], Series(chofer)]).reset_index(drop=True))
+        atendees = get_emails(sheets_service, staff)
+        transporte = first_sheet_df.loc[0, 'Transporte']
+        comentarios = first_sheet_df.loc[0, 'Comentarios']
+        logistica = first_sheet_df.loc[0, 'Logistica']
+        avisos = first_sheet_df.loc[0, 'Avisos']
+        # Retain renta_bicis logic
+        renta_bicis = first_sheet_df.loc[0, 'Renta de bicis'] if 'Renta de bicis' in first_sheet_df.columns else None
+        del first_sheet_df
+
+    except Exception as e:
+        print(f"There's a problem with the dataframe from sheet {tab_name}:", str(e))
+        return (None,None)
+
+    
+    # Process the VIAJEROS sheet for client status information
+    try:
+        second_sheet_df['STATUS'] = second_sheet_df['STATUS'].fillna('VIAJAN ✅')
+        second_sheet_df['PUNTO DE VENTA'] = second_sheet_df['PUNTO DE VENTA'].fillna('OTRO')
+        # Map statuses
+        second_sheet_df['STATUS'] = second_sheet_df['STATUS'].replace({
+            'RESERVADO✅': 'VIAJAN ✅',
+            'REBOOKED⚠️': 'NO VIAJAN 🚫',
+            'CANCELADO🚫': 'NO VIAJAN 🚫'
+        })
+        second_sheet_df = second_sheet_df.sort_values(by='STATUS')
+        clientes_by_status = second_sheet_df.groupby(['STATUS', 'PUNTO DE VENTA'])['NOMBRE'].apply(list)
+        clientes_by_status = clientes_by_status.sort_index(level='STATUS', ascending=False)
+        del second_sheet_df
+        clientes = get_clientes(clientes_by_status)
+    except Exception as e:
+        print("There's a problem with the dataframe from sheet VIAJEROS:", str(e))
+        return (None,None)
+    return (logs_data, all_data)
+
+
 
 def create_calendar(drive_service, sheets_service, calendar_service, file_id, file_name, tab_name):
     from pandas import DataFrame, concat, Series
@@ -739,7 +858,7 @@ def delete_calendar_and_folders_batch(drive_service, calendar_service, calendar_
         logging.warning(f"No photo folders to delete")
 
 
-def make_square_matrix(matrix):
+def make_square_matrix(matrix): #TODO: checar cómo se ve matrix y ver si se puede optimizar esta función
     if len(matrix)>0:
         max_length = max(len(row) for row in matrix)
         for row in matrix:
