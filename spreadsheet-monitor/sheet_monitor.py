@@ -1,6 +1,6 @@
 def main_function(drive_service, sheets_service, calendar_service, firestore_db):
     from sheet_monitor_helpers import get_last_state, get_month_from_file_name, get_year_from_file_name, find_last_subfolder_id, delete_logs, delete_calendar_and_folders_batch,\
-        update_calendar_and_folder, update_logs, inspect_logs, create_logs, create_calendar, create_photos_folder, attach_folder_to_calendar, make_file_public, store_state,\
+        update_calendar_and_folder, update_columns_logs, inspect_logs, create_logs, create_calendar, create_photos_folder, attach_folder_to_calendar, make_file_public, store_state,\
         get_tabs, get_data_hl
     import googleapiclient.errors as errors
     from datetime import datetime
@@ -36,7 +36,8 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                 if datetime.fromisoformat(change['time'][:-1])<= datetime.fromisoformat(last_processed_change_time[:-1]):
                     print('Skip changes that have already been processed')
                     continue
-            if (change['changeType'] == 'file' and 'file' in change and change['file'].get('mimeType')== 'application/vnd.google-apps.spreadsheet'):
+            file_type= change['file'].get('mimeType')
+            if (change['changeType'] == 'file' and 'file' in change and file_type== 'application/vnd.google-apps.spreadsheet'):
                 # the change is in a sheets file
                 file = change.get('file')
                 file_name=file.get('name')
@@ -84,31 +85,32 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                             is_first_itinerario=True #Necesito saber si es el primer tab y poner pagos, gastos, etc
                             if i>0:
                                 is_first_itinerario=False
-                            #logs_data, all_data=get_data_hl(sheets_service, file_id, tabs_names[i],is_first_itinerario, multiday)
-                            #if not logs_data:
-                            #    print(f'Error fetching data from tab {tabs_names[i]}')
-                            #    continue
-                            calendar_id, photos_folder_id, photos_folder_link=inspect_logs(sheets_service,file_id,tabs_ids[i],file_name,tabs_names[i])#this also updates the name of the file and tab in the logs
+                            all_data=get_data_hl(sheets_service, file_id, tabs_names[i],is_first_itinerario, multiday)
+                            if not all_data:
+                                continue #Nothing to do to this tab, go to next one
+                            keys_to_keep=['guia', 'apoyo','chofer','tour_name','start_date','transporte','num_clientes','multiday','venta','gastos','combustible']
+                            logs_data = [all_data[k] for k in keys_to_keep]
+                            
+                            calendar_id, photos_folder_id, photos_folder_link=inspect_logs(sheets_service,file_id,tabs_ids[i],file_name,tabs_names[i],logs_data)#this also updates the name of the file and tab in the logs
                             if calendar_id:
                                 #ya se había hecho un calendar event y está en los logs esta tab de la hoja logísitica
                                 print('Updating the calendar event and photos folder')
                                 if not photos_folder_id:
-                                    photos_folder_id, photos_folder_link = create_photos_folder(drive_service,file_name) if len(tabs_ids)==1 else create_photos_folder(drive_service,file_name+' '+tabs_names[i]) #sheets que no son multiday no llevan sufijo en el nombre
-                                    update_logs(sheets_service,file_id,tabs_ids[i],[photos_folder_id],['D'])#update photos_folder_id in column D
-                                    update_logs(sheets_service, file_id,tabs_ids[i], [photos_folder_link],['G'])
-                                update_calendar_and_folder(drive_service,sheets_service,calendar_service,file_id, calendar_id, photos_folder_id, file_name,tabs_names[i], photos_folder_link)
+                                    photos_folder_id, photos_folder_link = create_photos_folder(drive_service,file_name,tabs_names[i])
+                                    update_columns_logs(sheets_service,file_id,tabs_ids[i],[photos_folder_id,photos_folder_link],['D','G'])#update column D and G in logs
+                                update_calendar_and_folder(drive_service,calendar_service, calendar_id, folder_id, file_name, tabs_names[i], photos_folder_link,file_link,file_type, all_data)
                                 
                             else:
                                 #Es una nueva hoja logística o un nuevo tab de itinerario
                                 print('Creating a calendar event and photos folder for this experience')
-                                calendar_id,calendar_link = create_calendar(drive_service,sheets_service,calendar_service,file_id, file_name, tabs_names[i])
+                                calendar_id,calendar_link = create_calendar(calendar_service,file_link,file_type, file_name, all_data)
                                 if calendar_id:
-                                    photos_folder_id, photos_folder_link = create_photos_folder(drive_service,file_name) if len(tabs_ids)==1 else create_photos_folder(drive_service,file_name+' '+tabs_names[i]) #sheets que no son multiday no llevan sufijo en el nombre
-                                    create_logs(sheets_service,file_name,tabs_names[i], file_id, tabs_ids[i], calendar_id, photos_folder_id, file_link, calendar_link, photos_folder_link)
+                                    photos_folder_id, photos_folder_link = create_photos_folder(drive_service,file_name,tabs_names[i])
+                                    create_logs(sheets_service,file_name,tabs_names[i], file_id, tabs_ids[i], calendar_id, photos_folder_id, file_link, calendar_link, photos_folder_link,logs_data)
                                     make_file_public(drive_service,file_id,'reader')
                                     if photos_folder_id:
                                         make_file_public(drive_service,photos_folder_id,'writer')
-                                        attach_folder_to_calendar(calendar_service, calendar_id, photos_folder_link,file_name)
+                                        attach_folder_to_calendar(calendar_service, calendar_id, photos_folder_link)
                                 
             # Save the current page token and change ID after processing each change  
             last_processed_change_time=change['time']
