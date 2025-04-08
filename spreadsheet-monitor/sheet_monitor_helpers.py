@@ -361,9 +361,9 @@ def get_data_hl(sheets_service, file_id, tab_name,is_first_itinerario, multiday)
     
     # Process the PAGOS sheet
     try:
-        all_data['venta']= values_pagos_sheet[0]
-        all_data['gastos']= values_pagos_sheet[1]
-        all_data['combustible'] = values_pagos_sheet[-1]
+        all_data['venta']= parse_currency(values_pagos_sheet[0][0])
+        all_data['gastos']=parse_currency(values_pagos_sheet[1][0])
+        all_data['combustible'] = parse_currency(values_pagos_sheet[-1][0])
 
     except Exception as e:
         print("There's a problem with the data from sheet PAGOS:", str(e))
@@ -378,6 +378,8 @@ def get_data_hl(sheets_service, file_id, tab_name,is_first_itinerario, multiday)
 
     return all_data
 
+def parse_currency(value: str) -> float:
+    return float(value.replace('$', '').replace('.', '').replace(',', '.'))
 
 
 def create_calendar(calendar_service, file_link, file_type, file_name, all_data):
@@ -666,7 +668,7 @@ def update_calendar_and_folder(drive_service,calendar_service, calendar_id, fold
         else:
             name=file_name+' '+tab_name
         drive_service.files().update(fileId=folder_id, body={'name': name}).execute()
-        print(f'Photos folder name updated succesfully: {file_name+' '+tab_name}')
+        print(f"Photos folder name updated succesfully: {name}")
     except errors.HttpError as e:
         print('Name not updated in photos folder, an error has occured:',str(e))
         

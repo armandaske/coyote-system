@@ -7,7 +7,8 @@ from email_scraper_helpers import booking_logic, cancellation_logic, rebooking_l
 
 platforms_by_address_dict={
            'express@airbnb.com' : 'Airbnb',
-           'messages@fareharbor.com' : 'Fareharbor'
+           'messages@fareharbor.com' : 'Fareharbor',
+           'info@coyoteaventuras.com' : 'Fareharbor'
           } 
 
 procesado_label_object = {
@@ -71,7 +72,8 @@ def email_scraper_main(drive_service, sheets_service, gmail_service):
     week_before=get_time_week_before()
     queries = {
         f'from:(express@airbnb.com) NOT label:Procesado NOT label:Revisar after:{week_before}',
-        f'from:(messages@fareharbor.com) NOT label:Procesado NOT label:Revisar after:{week_before}'
+        f'from:(messages@fareharbor.com) NOT label:Procesado NOT label:Revisar after:{week_before}',
+        f'from:(info@coyoteaventuras.com) NOT label:Procesado NOT label:Revisar after:{week_before}'
     }
     for query in queries:
         try:

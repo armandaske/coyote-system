@@ -36,8 +36,8 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                 if datetime.fromisoformat(change['time'][:-1])<= datetime.fromisoformat(last_processed_change_time[:-1]):
                     print('Skip changes that have already been processed')
                     continue
-            file_type= change['file'].get('mimeType')
-            if (change['changeType'] == 'file' and 'file' in change and file_type== 'application/vnd.google-apps.spreadsheet'):
+            if (change['changeType'] == 'file' and 'file' in change and change['file'].get('mimeType') == 'application/vnd.google-apps.spreadsheet'):
+                file_type= change['file'].get('mimeType')
                 # the change is in a sheets file
                 file = change.get('file')
                 file_name=file.get('name')
@@ -51,7 +51,6 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                 
                 if not file_month or not file_year:
                     continue
-
                 is_child = False
                 directory_tree=['Workflow Coyote Armando Technologies', file_year,'Hojas Logísticas', file_month]       
                 all_folders_found, folder_id, folder_name= find_last_subfolder_id(drive_service,directory_tree)
@@ -90,7 +89,8 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                                 continue #Nothing to do to this tab, go to next one
                             keys_to_keep=['guia', 'apoyo','chofer','tour_name','start_date','transporte','num_clientes','multiday','venta','gastos','combustible']
                             logs_data = [all_data[k] for k in keys_to_keep]
-                            
+                            logs_data = [x if isinstance(x, (int, float, str)) else ('' if x is None else str(x)) for x in logs_data] #sanitize values for JSON
+
                             calendar_id, photos_folder_id, photos_folder_link=inspect_logs(sheets_service,file_id,tabs_ids[i],file_name,tabs_names[i],logs_data)#this also updates the name of the file and tab in the logs
                             if calendar_id:
                                 #ya se había hecho un calendar event y está en los logs esta tab de la hoja logísitica
@@ -98,7 +98,7 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                                 if not photos_folder_id:
                                     photos_folder_id, photos_folder_link = create_photos_folder(drive_service,file_name,tabs_names[i])
                                     update_columns_logs(sheets_service,file_id,tabs_ids[i],[photos_folder_id,photos_folder_link],['D','G'])#update column D and G in logs
-                                update_calendar_and_folder(drive_service,calendar_service, calendar_id, folder_id, file_name, tabs_names[i], photos_folder_link,file_link,file_type, all_data)
+                                update_calendar_and_folder(drive_service,calendar_service, calendar_id, photos_folder_id, file_name, tabs_names[i], photos_folder_link,file_link,file_type, all_data)
                                 
                             else:
                                 #Es una nueva hoja logística o un nuevo tab de itinerario
