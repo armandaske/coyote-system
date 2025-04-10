@@ -245,16 +245,20 @@ def get_data_hl(sheets_service, file_id, tab_name,is_first_itinerario, multiday)
 
     try:
         # Fetch only ITINERARIO to check the date
-        first_sheet_range = f"{tab_name}{getenv('NEW_ITINERARIO_RANGE')}"
+        first_sheet_range = f"{tab_name}{getenv('ITINERARIO_RANGE')}"
         response = sheets_service.spreadsheets().values().get(
             spreadsheetId=file_id, range=first_sheet_range
         ).execute()
+
+
 
         values_first_sheet = response.get('values', [])
 
         if not values_first_sheet:
             print(f'No data found in {tab_name}.')
             return
+        if values_first_sheet[0][0] != 'Guia principal': #A1
+            values_first_sheet=values_first_sheet[3::]
         # Ensure matrix is square
         values_first_sheet = make_square_matrix(values_first_sheet)
     except Exception as e:
@@ -342,12 +346,14 @@ def get_data_hl(sheets_service, file_id, tab_name,is_first_itinerario, multiday)
     try:
         second_sheet_df['STATUS'] = second_sheet_df['STATUS'].replace(r'^\s*$', NA, regex=True).fillna('VIAJAN ✅')
         second_sheet_df['PUNTO DE VENTA'] = second_sheet_df['PUNTO DE VENTA'].replace(r'^\s*$', NA, regex=True).fillna('OTRO')
+        
         # Map statuses
         second_sheet_df['STATUS'] = second_sheet_df['STATUS'].replace({
             'RESERVADO✅': 'VIAJAN ✅',
             'REBOOKED⚠️': 'NO VIAJAN 🚫',
             'CANCELADO🚫': 'NO VIAJAN 🚫'
         })
+    
         second_sheet_df = second_sheet_df.sort_values(by='STATUS') #TODO: Desde aquí hasta obtener el generator de clientes es posible que se pueda optimizar 
         clientes_by_status = second_sheet_df.groupby(['STATUS', 'PUNTO DE VENTA'])['NOMBRE'].apply(list)
         clientes_by_status = clientes_by_status.sort_index(level='STATUS', ascending=False)
@@ -745,7 +751,9 @@ def delete_calendar_and_folders_batch(drive_service, calendar_service, calendar_
 
 
 def make_square_matrix(matrix): #TODO: checar cómo se ve matrix y ver si se puede optimizar esta función
-    if len(matrix)>0:
+    #if len(matrix)==1:
+    #    matrix=matrix+([[None]*len(matrix[0])])
+    if len(matrix)>0: #if uncomment above this is >1
         max_length = max(len(row) for row in matrix)
         for row in matrix:
             while len(row) < max_length:
