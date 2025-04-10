@@ -5,10 +5,10 @@ entrypoint: gunicorn -b :$PORT -w 2 -t 60 app:app
 env_variables:
   TZ: "America/Mexico_City"
   SECRET_KEY: "2c4980313846217b1b163551414fda91e079a23154e7bf5c" #This is the key to encrypt cookies and other data for the user session
-  SECONDS_THRESHOLD_UPDATE: 43200000 #24hrs
-  ITINERARIO_RANGE: "!A1:M9"
+  SECONDS_THRESHOLD_UPDATE: 43200 #24hrs
+  ITINERARIO_RANGE: "!A1:M6"
   NEW_ITINERARIO_RANGE: "!A4:M9"
-  VIAJEROS_RANGE: "!A1:L40"
+  VIAJEROS_RANGE: "!A1:K40"
   EMAILS_RANGE: "!A2:B50"
   PAGOS_RANGE: "!B28:B38"
   PROJECT_ID: "640474142702" # It was supposed to be the ID but I changed to project number and it worked

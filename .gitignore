@@ -3,4 +3,3 @@ appengine-generated/
 *.log
 email-processor/.gcloudignore
 spreadsheet-monitor/.gcloudignore
-token.json

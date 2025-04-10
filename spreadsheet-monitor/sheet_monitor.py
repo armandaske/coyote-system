@@ -92,26 +92,25 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                             logs_data = [x if isinstance(x, (int, float, str)) else ('' if x is None else str(x)) for x in logs_data] #sanitize values for JSON
 
                             calendar_id, photos_folder_id, photos_folder_link=inspect_logs(sheets_service,file_id,tabs_ids[i],file_name,tabs_names[i],logs_data)#this also updates the name of the file and tab in the logs
-                            #if calendar_id:
-                            #    #ya se había hecho un calendar event y está en los logs esta tab de la hoja logísitica
-                            #    print('Updating the calendar event and photos folder')
-                            #    if not photos_folder_id:
-                            #        photos_folder_id, photos_folder_link = create_photos_folder(drive_service,file_name,tabs_names[i])
-                            #        #update photos folder id and link in the logs
-                            #        update_columns_logs(sheets_service,file_id,tabs_ids[i],[photos_folder_id,photos_folder_link],['D','G'])
-                            #    update_calendar_and_folder(drive_service,calendar_service, calendar_id, photos_folder_id, file_name, tabs_names[i], photos_folder_link,file_link,file_type, all_data)
-                            #    
-                            #else:
-                            #    #Es una nueva hoja logística o un nuevo tab de itinerario
-                            #    print('Creating a calendar event and photos folder for this experience')
-                            #    calendar_id,calendar_link = create_calendar(calendar_service,file_link,file_type, file_name, all_data)
-                            #    if calendar_id:
-                            #        photos_folder_id, photos_folder_link = create_photos_folder(drive_service,file_name,tabs_names[i])
-                            #        create_logs(sheets_service,file_name,tabs_names[i], file_id, tabs_ids[i], calendar_id, photos_folder_id, file_link, calendar_link, photos_folder_link,logs_data)
-                            #        make_file_public(drive_service,file_id,'reader')
-                            #        if photos_folder_id:
-                            #            make_file_public(drive_service,photos_folder_id,'writer')
-                            #            attach_folder_to_calendar(calendar_service, calendar_id, photos_folder_link)
+                            if calendar_id:
+                                #ya se había hecho un calendar event y está en los logs esta tab de la hoja logísitica
+                                print('Updating the calendar event and photos folder')
+                                if not photos_folder_id:
+                                    photos_folder_id, photos_folder_link = create_photos_folder(drive_service,file_name,tabs_names[i])
+                                    update_columns_logs(sheets_service,file_id,tabs_ids[i],[photos_folder_id,photos_folder_link],['D','G'])#update column D and G in logs
+                                update_calendar_and_folder(drive_service,calendar_service, calendar_id, photos_folder_id, file_name, tabs_names[i], photos_folder_link,file_link,file_type, all_data)
+                                
+                            else:
+                                #Es una nueva hoja logística o un nuevo tab de itinerario
+                                print('Creating a calendar event and photos folder for this experience')
+                                calendar_id,calendar_link = create_calendar(calendar_service,file_link,file_type, file_name, all_data)
+                                if calendar_id:
+                                    photos_folder_id, photos_folder_link = create_photos_folder(drive_service,file_name,tabs_names[i])
+                                    create_logs(sheets_service,file_name,tabs_names[i], file_id, tabs_ids[i], calendar_id, photos_folder_id, file_link, calendar_link, photos_folder_link,logs_data)
+                                    make_file_public(drive_service,file_id,'reader')
+                                    if photos_folder_id:
+                                        make_file_public(drive_service,photos_folder_id,'writer')
+                                        attach_folder_to_calendar(calendar_service, calendar_id, photos_folder_link)
                                 
             # Save the current page token and change ID after processing each change  
             last_processed_change_time=change['time']
