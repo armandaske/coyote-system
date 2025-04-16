@@ -135,7 +135,7 @@ def update_logs(sheets_service,file_id, tab_id, file_name, tab_name, new_row_val
             row[0]=file_name
             row[7]=tab_name
             new_row_values=row+new_row_values
-            range_ = f"{sheet_name}!A{i+1}:T{i+1}"  # Replace the full row (columns A to T)
+            range_ = f"{sheet_name}!A{i+1}:U{i+1}"  # Replace the full row (columns A to U)
             body = {
                 "values": [new_row_values]
             }
@@ -178,7 +178,7 @@ def inspect_logs(sheets_service,file_id,tab_id, file_name, tab_name, logs_data):
     
 def delete_logs(sheets_service, file_id):
     sheet_name = 'logs'
-    data_range = f'{sheet_name}!A:T'
+    data_range = f'{sheet_name}!A:U'
 
     # Get only the required data, skipping the spreadsheet metadata request
     result = sheets_service.spreadsheets().values().get(spreadsheetId=LOG_FILE_ID, range=data_range).execute()

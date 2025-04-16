@@ -3,6 +3,7 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
         update_calendar_and_folder, update_columns_logs, inspect_logs, create_logs, create_calendar, create_photos_folder, attach_folder_to_calendar, make_file_public, store_state,\
         get_tabs, get_data_hl
     import googleapiclient.errors as errors
+    import re
     from datetime import datetime
     from os import getenv
     import gc
@@ -76,6 +77,11 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                     
                     else:
                         #The file was modified or recently created
+                        if bool(re.search(r'cancela(do)?|cance(lo)?', file_name, re.IGNORECASE)): #Check si está cancelado
+                            tour_status='cancelado'
+                        else:
+                            tour_status='activo'
+                            
                         tabs_names,tabs_ids=get_tabs(sheets_service, file_id, 'ITINERARIO')
                         multiday='NO'
                         if len(tabs_ids)>1:
@@ -89,6 +95,7 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                                 continue #Nothing to do to this tab, go to next one
                             keys_to_keep=['guia', 'apoyo','chofer','tour_name','start_date','transporte','num_clientes','multiday','venta','gastos','combustible']
                             logs_data = [all_data[k] for k in keys_to_keep]
+                            logs_data.append(tour_status)
                             logs_data = [x if isinstance(x, (int, float, str)) else ('' if x is None else str(x)) for x in logs_data] #sanitize values for JSON
 
                             calendar_id, photos_folder_id, photos_folder_link=inspect_logs(sheets_service,file_id,tabs_ids[i],file_name,tabs_names[i],logs_data)#this also updates the name of the file and tab in the logs
