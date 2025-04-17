@@ -93,7 +93,7 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                             all_data=get_data_hl(sheets_service, file_id, tabs_names[i],is_first_itinerario, multiday)
                             if not all_data:
                                 continue #Nothing to do to this tab, go to next one
-                            keys_to_keep=['guia', 'apoyo','chofer','tour_name','start_date','transporte','num_clientes','multiday','venta','gastos','combustible']
+                            keys_to_keep=['guia', 'apoyo','chofer','tour_name','start_date','transporte','num_clientes','multiday','venta','gastos','combustible','gasto_efectivo']
                             logs_data = [all_data[k] for k in keys_to_keep]
                             logs_data.append(tour_status)
                             logs_data = [x if isinstance(x, (int, float, str)) else ('' if x is None else str(x)) for x in logs_data] #sanitize values for JSON

@@ -135,7 +135,7 @@ def update_logs(sheets_service,file_id, tab_id, file_name, tab_name, new_row_val
             row[0]=file_name
             row[7]=tab_name
             new_row_values=row+new_row_values
-            range_ = f"{sheet_name}!A{i+1}:U{i+1}"  # Replace the full row (columns A to U)
+            range_ = f"{sheet_name}!A{i+1}:V{i+1}"  # Replace the full row (columns A to V)
             body = {
                 "values": [new_row_values]
             }
@@ -178,7 +178,7 @@ def inspect_logs(sheets_service,file_id,tab_id, file_name, tab_name, logs_data):
     
 def delete_logs(sheets_service, file_id):
     sheet_name = 'logs'
-    data_range = f'{sheet_name}!A:U'
+    data_range = f'{sheet_name}!A:V'
 
     # Get only the required data, skipping the spreadsheet metadata request
     result = sheets_service.spreadsheets().values().get(spreadsheetId=LOG_FILE_ID, range=data_range).execute()
@@ -361,9 +361,10 @@ def get_data_hl(sheets_service, file_id, tab_name,is_first_itinerario, multiday)
     
     # Process the PAGOS sheet
     try:
-        all_data['venta']= parse_currency(values_pagos_sheet[0][0])
-        all_data['gastos']=parse_currency(values_pagos_sheet[1][0])
-        all_data['combustible'] = parse_currency(values_pagos_sheet[-1][0])
+        all_data['venta']= parse_currency(safe_parse(values_pagos_sheet, 0))#only use the row index, in the function i already set the column to 0
+        all_data['gastos']=parse_currency(safe_parse(values_pagos_sheet, 1))
+        all_data['gasto_efectivo']=parse_currency(safe_parse(values_pagos_sheet, 9))
+        all_data['combustible'] = parse_currency(safe_parse(values_pagos_sheet, 10))
 
     except Exception as e:
         print("There's a problem with the data from sheet PAGOS:", str(e))
@@ -373,13 +374,38 @@ def get_data_hl(sheets_service, file_id, tab_name,is_first_itinerario, multiday)
     if not is_first_itinerario:
         all_data['venta']=None
         all_data['gastos']=None
+        all_data['gasto_efectivo']=None
         all_data['combustible']=None
         all_data['multiday']=None
 
     return all_data
 
-def parse_currency(value: str) -> float:
-    return float(value.replace('$', '').replace('.', '').replace(',', '.'))
+def safe_parse(sheet, row, col=0):
+    try:
+        return sheet[row][col]
+    except (IndexError, TypeError):
+        return 0  # fallback value
+
+def parse_currency(value):
+    try:
+        if value is None:
+            return 0
+
+        value = str(value).strip()
+
+        # Case 1: comma as decimal separator (European-style)
+        if ',' in value and not '.' in value:
+            cleaned = re.sub(r'[^\d,]', '', value).replace(',', '.')
+        # Case 2: both dot and comma present (European-style with thousands separator)
+        elif '.' in value and ',' in value:
+            cleaned = re.sub(r'[^\d,\.]', '', value).replace('.', '').replace(',', '.')
+        # Case 3: US-style (dot is decimal separator)
+        else:
+            cleaned = re.sub(r'[^\d.-]', '', value)
+
+        return float(cleaned) if cleaned else 0
+    except (ValueError, TypeError):
+        return 0
 
 
 def create_calendar(calendar_service, file_link, file_type, file_name, all_data):
