@@ -135,7 +135,7 @@ def update_logs(sheets_service,file_id, tab_id, file_name, tab_name, new_row_val
             row[0]=file_name
             row[7]=tab_name
             new_row_values=row+new_row_values
-            range_ = f"{sheet_name}!A{i+1}:V{i+1}"  # Replace the full row (columns A to V)
+            range_ = f"{sheet_name}!A{i+1}:AA{i+1}"  # Replace the full row (columns A to AA)
             body = {
                 "values": [new_row_values]
             }
@@ -178,7 +178,7 @@ def inspect_logs(sheets_service,file_id,tab_id, file_name, tab_name, logs_data):
     
 def delete_logs(sheets_service, file_id):
     sheet_name = 'logs'
-    data_range = f'{sheet_name}!A:V'
+    data_range = f'{sheet_name}!A:AA'
 
     # Get only the required data, skipping the spreadsheet metadata request
     result = sheets_service.spreadsheets().values().get(spreadsheetId=LOG_FILE_ID, range=data_range).execute()
@@ -365,6 +365,12 @@ def get_data_hl(sheets_service, file_id, tab_name,is_first_itinerario, multiday)
         all_data['gastos']=parse_currency(safe_parse(values_pagos_sheet, 1))
         all_data['gasto_efectivo']=parse_currency(safe_parse(values_pagos_sheet, 9))
         all_data['combustible'] = parse_currency(safe_parse(values_pagos_sheet, 10))
+        all_data['pago_chofer'] = parse_currency(safe_parse(values_pagos_sheet, 11))
+        all_data['pago_guia'] = parse_currency(safe_parse(values_pagos_sheet, 12))
+        all_data['pago_apoyo'] = parse_currency(safe_parse(values_pagos_sheet, 13))
+        all_data['pago_apoyo_2'] = parse_currency(safe_parse(values_pagos_sheet, 14))
+        all_data['pago_apoyo_3'] = parse_currency(safe_parse(values_pagos_sheet, 15))
+        
 
     except Exception as e:
         print("There's a problem with the data from sheet PAGOS:", str(e))
@@ -376,6 +382,11 @@ def get_data_hl(sheets_service, file_id, tab_name,is_first_itinerario, multiday)
         all_data['gastos']=None
         all_data['gasto_efectivo']=None
         all_data['combustible']=None
+        all_data['pago_chofer'] = None
+        all_data['pago_guia'] = None
+        all_data['pago_apoyo'] = None
+        all_data['pago_apoyo_2'] = None
+        all_data['pago_apoyo_3'] = None
         all_data['multiday']=None
 
     return all_data
