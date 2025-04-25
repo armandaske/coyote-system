@@ -861,24 +861,32 @@ def fh_extract_booking_info(soup):
     # Extract names_of_guests and ages from the correct table
     details_h2 = soup.find('h2', string="Details")
     correct_table = details_h2.find_next_sibling('table') if details_h2 else None
+    
     names_of_guests = []
     ages = []
     payments=[]
     country = ''
     comments=[]
     if correct_table:
-        #get amount paid
-        payment_elements = correct_table.find_all('span', string=re.compile("General Ticket|Private Group", re.IGNORECASE)) 
-        if not payment_elements:
-            payment_elements = correct_table.find_all('b', string=re.compile(r"\bTotal\b", re.IGNORECASE)) 
-
-        payments=[convert_currency_to_float(payment.find_next('td').get_text(strip=True)) for payment in payment_elements]
         #get names
         names_elements = correct_table.find_all('b', string="Full name:")
         names_of_guests = [elem.parent.get_text(strip=True).replace('Full name:', '').strip() for elem in names_elements]
 
         if number_of_guests<len(names_of_guests):
             number_of_guests=len(names_of_guests)
+
+        #get due amount
+        due_element = soup.find('b', string="Due:")
+        due_amount=convert_currency_to_float(due_element.parent.get_text(strip=True).split(':')[1])
+        due_amount_per_guest=due_amount/number_of_guests
+
+         #get amount paid
+        payment_elements = correct_table.find_all('span', string=re.compile("General Ticket|Private Group", re.IGNORECASE)) 
+        if not payment_elements:
+            payment_elements = correct_table.find_all('b', string=re.compile(r"\bTotal\b", re.IGNORECASE)) 
+
+        payments=[convert_currency_to_float(payment.find_next('td').get_text(strip=True))-due_amount_per_guest for payment in payment_elements]
+
         #get ages
         ages_elements = correct_table.find_all('b', string="Age:")   
         ages = [elem.parent.get_text(strip=True).replace('Age:', '').strip() for elem in ages_elements]

@@ -3,7 +3,7 @@ import os
 from bs4 import BeautifulSoup
 
 # Path to your HTML file
-file_name = 'Fareharbor_booking.html'
+file_name = r'C:\Users\Dell-G3\.spyder-py3\coyote-system\tests\fareharbor_booking_due.html'
 
 # Add the parent directory of the email_scraper folder to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'email-processor')))
