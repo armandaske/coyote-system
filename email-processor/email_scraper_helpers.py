@@ -752,6 +752,7 @@ def abnb_extract_booking_info(soup):
         # Extract the text following 'Pago'  
         text_after_pago = pago_element.find_next('p').text.strip()
         payment= convert_currency_to_float(text_after_pago)
+        payment=payment*1.2083 #ajustar para los montos extras de IVA y tasas que abona Airbnb, el valor se sacó empíricamente
         payments=[payment]*number_of_guests
     else:
         print("Error. Couldn't find 'Pago' in the airbnb email")
