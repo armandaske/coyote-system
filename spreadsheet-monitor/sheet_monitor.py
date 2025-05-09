@@ -82,7 +82,7 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                         else:
                             tour_status='activo'
                             
-                        tabs_names,tabs_ids=get_tabs(sheets_service, file_id, 'ITINERARIO')
+                        tabs_names,tabs_ids=get_tabs(sheets_service, file_id, 'ITINERARIO',True)
                         multiday='NO'
                         if len(tabs_ids)>1:
                             multiday='SI'

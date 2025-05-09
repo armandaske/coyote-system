@@ -224,13 +224,21 @@ def delete_logs(sheets_service, file_id):
     print(f"Deleted {len(rows_to_delete)} rows in {sheet_name}")
     return (calendar_ids, folder_ids)
 
-def get_tabs(sheets_service, file_id, keyword):
+def odd_minute_random():
+    return datetime.now().minute % 2 == 1
+
+def get_tabs(sheets_service, file_id, keyword, random):
     # Fetch details of the spreadsheet using the Sheets API
     spreadsheet = sheets_service.spreadsheets().get(spreadsheetId=file_id).execute()
     sheets = spreadsheet.get('sheets', [])
     
     tabs_names=[]
     tabs_ids=[]
+    
+    # If random is True, check if the current minute is odd
+    if random and odd_minute_random():
+        sheets=sheets[::-1]  # Reverse the order of sheets only if user chose random and there is an odd minute  
+
     # Iterate through each sheet and check if the keyword is present in the sheet name
     for sheet in sheets:
         sheet_title = sheet['properties']['title']
