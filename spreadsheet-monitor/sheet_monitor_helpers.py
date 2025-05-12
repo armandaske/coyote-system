@@ -248,7 +248,7 @@ def get_tabs(sheets_service, file_id, keyword, random):
             tabs_ids.append(sheet_id)
     return (tabs_names,tabs_ids)
 
-def get_data_hl(sheets_service, file_id, tab_name,is_first_itinerario, multiday): 
+def get_data_hl(sheets_service, file_id, tab_name,file_name, multiday): 
     from pandas import DataFrame, concat, Series, NA
 
     try:
@@ -385,7 +385,7 @@ def get_data_hl(sheets_service, file_id, tab_name,is_first_itinerario, multiday)
         return
     
     #si es el segundo día de un multiday no poner datos redundantes
-    if not is_first_itinerario:
+    if multiday== 'SI' and not is_date_in_filename(start_date, file_name):
         all_data['venta']=None
         all_data['gastos']=None
         all_data['gasto_efectivo']=None
@@ -398,6 +398,20 @@ def get_data_hl(sheets_service, file_id, tab_name,is_first_itinerario, multiday)
         all_data['multiday']=None
 
     return all_data
+
+def is_date_in_filename(date_str, text):
+    try:
+        # Parse input date string
+        date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+        
+        # Create both formats
+        format_1 = date_obj.strftime('%Y-%m-%d')  # e.g., 2025-01-30
+        format_2 = date_obj.strftime('%d-%m-%Y')  # e.g., 30-01-2025
+
+        return format_1 in text or format_2 in text
+    except ValueError:
+        return False
+
 
 def safe_parse(sheet, row, col=0):
     try:

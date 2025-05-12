@@ -87,10 +87,8 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                         if len(tabs_ids)>1:
                             multiday='SI'
                         for i in range(len(tabs_ids)):
-                            is_first_itinerario=True #Necesito saber si es el primer tab y poner pagos, gastos, etc
-                            if i>0:
-                                is_first_itinerario=False
-                            all_data=get_data_hl(sheets_service, file_id, tabs_names[i],is_first_itinerario, multiday)
+                            #Get the data from the tab
+                            all_data=get_data_hl(sheets_service, file_id, tabs_names[i],file_name, multiday)
                             if not all_data:
                                 continue #Nothing to do to this tab, go to next one
                             keys_to_keep=['guia', 'apoyo','chofer','tour_name','start_date','transporte','num_clientes','multiday','venta','gastos','combustible','gasto_efectivo','pago_chofer',\
