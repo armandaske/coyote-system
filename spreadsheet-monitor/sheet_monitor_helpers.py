@@ -135,7 +135,7 @@ def update_logs(sheets_service,file_id, tab_id, file_name, tab_name, new_row_val
             row[0]=file_name
             row[7]=tab_name
             new_row_values=row+new_row_values
-            range_ = f"{sheet_name}!A{i+1}:AA{i+1}"  # Replace the full row (columns A to AA)
+            range_ = f"{sheet_name}!A{i+1}:AI{i+1}"  # Replace the full row (columns A to AI)
             body = {
                 "values": [new_row_values]
             }
@@ -178,7 +178,7 @@ def inspect_logs(sheets_service,file_id,tab_id, file_name, tab_name, logs_data):
     
 def delete_logs(sheets_service, file_id):
     sheet_name = 'logs'
-    data_range = f'{sheet_name}!A:AA'
+    data_range = f'{sheet_name}!A:AI'
 
     # Get only the required data, skipping the spreadsheet metadata request
     result = sheets_service.spreadsheets().values().get(spreadsheetId=LOG_FILE_ID, range=data_range).execute()
@@ -378,13 +378,22 @@ def get_data_hl(sheets_service, file_id, tab_name,file_name, multiday):
         all_data['pago_apoyo'] = parse_currency(safe_parse(values_pagos_sheet, 13))
         all_data['pago_apoyo_2'] = parse_currency(safe_parse(values_pagos_sheet, 14))
         all_data['pago_apoyo_3'] = parse_currency(safe_parse(values_pagos_sheet, 15))
-        
+
+        #Sección de cobros
+        all_data['cobro_efectivo']=parse_currency(safe_parse(values_pagos_sheet, 5, 3)) #column 3 is the amount of cobros
+        all_data['cobro_transfe']=parse_currency(safe_parse(values_pagos_sheet, 6, 3))
+        all_data['cobro_izettle'] = parse_currency(safe_parse(values_pagos_sheet, 7, 3))
+        all_data['cobro_fareharbor'] = parse_currency(safe_parse(values_pagos_sheet, 8, 3))
+        all_data['cobro_airbnb'] = parse_currency(safe_parse(values_pagos_sheet, 9, 3))
+        all_data['cobro_tripadvisor'] = parse_currency(safe_parse(values_pagos_sheet, 10, 3))
+        all_data['cobro_get_your_guide'] = parse_currency(safe_parse(values_pagos_sheet, 11, 3))
+        all_data['cobro_otros'] = parse_currency(safe_parse(values_pagos_sheet, 12, 3))
 
     except Exception as e:
         print("There's a problem with the data from sheet PAGOS:", str(e))
         return
     
-    #si es el segundo día de un multiday no poner datos redundantes
+    #si son los tabs adicionales de un multiday no poner datos redundantes
     if multiday== 'SI' and not is_date_in_filename(start_date, file_name):
         all_data['venta']=None
         all_data['gastos']=None
@@ -396,6 +405,14 @@ def get_data_hl(sheets_service, file_id, tab_name,file_name, multiday):
         all_data['pago_apoyo_2'] = None
         all_data['pago_apoyo_3'] = None
         all_data['multiday']=None
+        all_data['cobro_efectivo']=None
+        all_data['cobro_transfe'] = None
+        all_data['cobro_izettle'] = None
+        all_data['cobro_fareharbor'] = None
+        all_data['cobro_airbnb'] = None
+        all_data['cobro_tripadvisor'] = None
+        all_data['cobro_get_your_guide'] = None
+        all_data['cobro_otros'] = None
 
     return all_data
 
