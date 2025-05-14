@@ -294,24 +294,36 @@ def get_data_hl(sheets_service, file_id, tab_name,file_name, multiday):
         return
          
     try:
-        # Step 3: Fetch the remaining sheets since the event is valid
-        ranges = [
-            f"VIAJEROS{getenv('VIAJEROS_RANGE')}",
-            f"PAGOS{getenv('PAGOS_RANGE')}",
-        ]
-        batch_response = sheets_service.spreadsheets().values().batchGet(
+
+        #si son los tabs adicionales de un multiday no se necesita datos de pagos
+        if multiday== 'SI' and not is_date_in_filename(start_date, file_name):
+            ranges = [f"VIAJEROS{getenv('VIAJEROS_RANGE')}"]
+            batch_response = sheets_service.spreadsheets().values().batchGet(
             spreadsheetId=file_id, ranges=ranges
-        ).execute()
+            ).execute()
+            values_second_sheet = batch_response['valueRanges'][0].get('values', [])
+            if not values_second_sheet:
+                print("No data found in VIAJEROS.")
+                return
+        else:  
+            # Step 3: Fetch the remaining sheets since the event is valid
+            ranges = [
+                f"VIAJEROS{getenv('VIAJEROS_RANGE')}",
+                f"PAGOS{getenv('PAGOS_RANGE')}",
+            ]
+            batch_response = sheets_service.spreadsheets().values().batchGet(
+                spreadsheetId=file_id, ranges=ranges
+            ).execute()
 
-        values_second_sheet = batch_response['valueRanges'][0].get('values', [])
-        values_pagos_sheet = batch_response['valueRanges'][1].get('values', [])
+            values_second_sheet = batch_response['valueRanges'][0].get('values', [])
+            values_pagos_sheet = batch_response['valueRanges'][1].get('values', [])
 
-        if not values_second_sheet:
-            print("No data found in VIAJEROS.")
-            return
-        if not values_pagos_sheet:
-            print("No data found in PAGOS.")
-            return
+            if not values_second_sheet:
+                print("No data found in VIAJEROS.")
+                return
+            if not values_pagos_sheet:
+                print("No data found in PAGOS.")
+                return
 
         values_second_sheet = make_square_matrix(values_second_sheet)
         second_sheet_df = DataFrame(values_second_sheet[1:], columns=values_second_sheet[0])
@@ -367,6 +379,30 @@ def get_data_hl(sheets_service, file_id, tab_name,file_name, multiday):
         print("There's a problem with the dataframe from sheet VIAJEROS:", str(e))
         return
     
+        #si son los tabs adicionales de un multiday no poner datos redundantes
+    if multiday== 'SI' and not is_date_in_filename(start_date, file_name):
+        all_data['num_clientes']=None
+        all_data['venta']=None
+        all_data['gastos']=None
+        all_data['gasto_efectivo']=None
+        all_data['combustible']=None
+        all_data['pago_chofer'] = None
+        all_data['pago_guia'] = None
+        all_data['pago_apoyo'] = None
+        all_data['pago_apoyo_2'] = None
+        all_data['pago_apoyo_3'] = None
+        all_data['multiday']=None
+        all_data['cobro_efectivo']=None
+        all_data['cobro_transfe'] = None
+        all_data['cobro_izettle'] = None
+        all_data['cobro_fareharbor'] = None
+        all_data['cobro_airbnb'] = None
+        all_data['cobro_tripadvisor'] = None
+        all_data['cobro_get_your_guide'] = None
+        all_data['cobro_otros'] = None
+
+        return all_data
+
     # Process the PAGOS sheet
     try:
         all_data['venta']= parse_currency(safe_parse(values_pagos_sheet, 0))#only use the row index, in the function i already set the column to 0
@@ -393,27 +429,6 @@ def get_data_hl(sheets_service, file_id, tab_name,file_name, multiday):
         print("There's a problem with the data from sheet PAGOS:", str(e))
         return
     
-    #si son los tabs adicionales de un multiday no poner datos redundantes
-    if multiday== 'SI' and not is_date_in_filename(start_date, file_name):
-        all_data['venta']=None
-        all_data['gastos']=None
-        all_data['gasto_efectivo']=None
-        all_data['combustible']=None
-        all_data['pago_chofer'] = None
-        all_data['pago_guia'] = None
-        all_data['pago_apoyo'] = None
-        all_data['pago_apoyo_2'] = None
-        all_data['pago_apoyo_3'] = None
-        all_data['multiday']=None
-        all_data['cobro_efectivo']=None
-        all_data['cobro_transfe'] = None
-        all_data['cobro_izettle'] = None
-        all_data['cobro_fareharbor'] = None
-        all_data['cobro_airbnb'] = None
-        all_data['cobro_tripadvisor'] = None
-        all_data['cobro_get_your_guide'] = None
-        all_data['cobro_otros'] = None
-
     return all_data
 
 def is_date_in_filename(date_str, text):
