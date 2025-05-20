@@ -151,3 +151,25 @@ def reset_watch():
     # La API deja de watchear y hacer push notifications hasta que el método stop sea llamado o después de 7 días
     print(watch)
     return 'Watch method reset successfully', 200
+
+
+@app.route('/ping-endpoint')
+def ping_endpoint():
+    url = 'https://starlit-complex-410801.uc.r.appspot.com/pubsub-endpoint'
+
+    # Hardcoded payload mimicking a Pub/Sub push
+    payload = {
+        "message": {
+            "data": "dGVzdA=="  # "test" in base64
+        }
+    }
+
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        return f"Ping sent. Response status: {response.status_code}, body: {response.text}", 200
+    except Exception as e:
+        return f"Error during ping: {str(e)}", 500
