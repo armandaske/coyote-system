@@ -23,7 +23,7 @@ del cred
 firestore_db = firestore.client()  # my firebase database
 # Set up watch request
 watch_request = {
-    'labelIds': ['INBOX'],
+    'labelIds': ['UNREAD'], #UNREAD, INBOX
     'topicName': f'projects/{PROJECT_ID}/topics/{TOPIC_ID}',
     'labelFilterBehavior': 'INCLUDE'
 }
