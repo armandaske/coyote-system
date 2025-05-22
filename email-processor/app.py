@@ -23,9 +23,9 @@ del cred
 firestore_db = firestore.client()  # my firebase database
 # Set up watch request
 watch_request = {
-    'labelIds': ['UNREAD'], #UNREAD, INBOX
+    #'labelIds': ['UNREAD'], #UNREAD, INBOX
     'topicName': f'projects/{PROJECT_ID}/topics/{TOPIC_ID}',
-    'labelFilterBehavior': 'INCLUDE'
+    #'labelFilterBehavior': 'INCLUDE'
 }
 
 
@@ -114,27 +114,53 @@ def transaction_callback(transaction, doc, field):
     print(f'{field} was already True')
     return False
 
-# @app.route('/pubsub-handler', methods=['POST'])
-
 
 def pubsub_handler(gmail_service, drive_service, sheets_service, payload):
     print(f"Received message: {payload}")
     locked2 = False
     try:
-        email_scraper_main(drive_service, sheets_service, gmail_service)
-        print('finished email_scraper routine')
-        doc = firestore_db.collection('locks').document('pubsub-lock')
-        snapshot = doc.get()
-        locked2 = snapshot.to_dict().get('locked2')
+        #1.  Load previous historyId
+        doc = firestore_db.collection('email_history').document('history_id').get()
+        doc_data = doc.to_dict()
+        previous_history_id_raw = doc_data.get("historyId")
+        previous_history_id = str(int(previous_history_id_raw.strip()))
+
+        # 2. Use users.history.list to get new messages
+        response = gmail_service.users().history().list(
+            userId='me',
+            startHistoryId=previous_history_id,
+            historyTypes=['messageAdded', 'labelAdded', 'labelRemoved']
+        ).execute()
+
+
+        #print(f"Response from Gmail API: {response}")
+        # 3. Process new messages
+        if 'history' in response:
+            email_scraper_main(drive_service, sheets_service, gmail_service)
+            print('finished email_scraper routine')
+
+        # 4. Update historyId in Firestore
+        new_history_id = response.get('historyId')
+        if new_history_id:
+            firestore_db.collection('email_history').document('history_id').set({
+                'historyId': new_history_id
+            })
+
+        doc = firestore_db.collection('locks').document('pubsub-lock').get()
+        locked2 = doc.to_dict().get('locked2')
+
+    except Exception as e:
+        print(f"Error in pubsub_handler: {e}")
+
     finally:
-        print('releasing lock')
         release_lock()
-        if locked2:  # There's a pending change in gmail that occurred during the first processing. Will ping the pubsub-endpoint to run the email_scraper routine again
+        if locked2:
             payload = {'message': 'new endpoint call from my app'}
             headers = {'Content-Type': 'application/json'}
-            requests.post(URL+'/pubsub-endpoint',
-                          json=payload, headers=headers)
+            requests.post(URL + '/pubsub-endpoint', json=payload, headers=headers)
+
         return 'released lock complete'
+
 
 
 def release_lock():
@@ -144,13 +170,30 @@ def release_lock():
 
 @app.route('/reset-watch')
 def reset_watch():
+    gmail_service = build('gmail', 'v1', credentials=g.creds)
+    watch = gmail_service.users().watch(userId='me', body=watch_request).execute()
+
+    # Save the historyId to Firestore
+    firestore_db.collection('email_history').document('history_id').set({
+        'historyId': watch.get('historyId')
+    })
+
+    print(f"Watch started. {watch}")
+    return 'Watch method reset successfully', 200
+
+
+
+@app.route('/stop-watch')
+def stop_watch():
     # Execute the watch request
     gmail_service = build('gmail', 'v1', credentials=g.creds)
-    # Inicializa el modo watch de la API de Gmail así que solo debo llamarlo cada <7 días.
-    watch = gmail_service.users().watch(userId='me', body=watch_request).execute()
-    # La API deja de watchear y hacer push notifications hasta que el método stop sea llamado o después de 7 días
-    print(watch)
-    return 'Watch method reset successfully', 200
+    
+    # Detiene el modo watch de la API de Gmail
+    stop = gmail_service.users().stop(userId='me').execute()
+    print(stop)
+    return 'Stop watch method done successfully', 200
+
+
 
 
 @app.route('/ping-endpoint')

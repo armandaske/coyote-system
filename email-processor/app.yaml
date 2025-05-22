@@ -6,9 +6,7 @@ env_variables:
   SECRET_KEY: "2c4980313846217b1b163551414fda91e079a23154e7bf5c" #This is the key to encrypt cookies and other data for the user session
   PROJECT_ID: "starlit-complex-410801" # It was supposed to be the ID but I changed to project number and it worked
   PROJECT_NUMBER: "846835317031"
-  SUBSCRIPTION_ID: "incomig_email-sub"
-  TOPIC_ID: "incomig_email"
+  TOPIC_ID: "prueba1"
   SECRET_ID: "web_client_secret"
-  #OTRO_FILE_ID: "1eOsU-ko2SgH5ptQ-eptjL4vv5ZT3fOSAyki0A0bMla4" #normal
   OTRO_FILE_ID: "1Fs4UPe668k6BKJC8p2opuNKJKD2JnrMVQZDvAb-VcjY" #multiday
   URL: "http://starlit-complex-410801.uc.r.appspot.com"

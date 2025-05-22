@@ -2,3 +2,7 @@ cron:
 - description: "Reset Gmail watch method every 24 hours"
   url: /reset-watch
   schedule: every 24 hours
+
+#- description: "Ping Gmail pubsub endpoint every hour"
+#  url: /ping-endpoint
+#  schedule: every 1 hours
