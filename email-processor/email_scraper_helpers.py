@@ -18,7 +18,8 @@ unificar_nombres_tours_dict={'La mejor caminata hasta Hierve el Agua y mezcal':'
                     'Ultimate Hierve el Agua Hike & Teotitlan Textiles': 'Ultimate Hike Hierve el Agua + Teotitlán',
                     'Ultimate Hike Hierve el Agua & Mezcal': 'Ultimate Hike Hierve el Agua + Mezcal',
                     'Hiking in the Enchanted Forest of Ixtepeji with Rescue Dogs': 'Hike with caravana canina rescue dogs Ixtepeji forest',
-                    'Hike in the Sierra Norte, Cuajimoloyas' : 'Immerse yourself in the Sierra Norte, Cuajimoloyas'
+                    'Hike in the Sierra Norte, Cuajimoloyas' : 'Immerse yourself in the Sierra Norte, Cuajimoloyas',
+                    'Hike & Swim in the Mixteca Region, Apoala Waterfalls' : 'Hike + Swim at Apoala Waterfalls',
                     
                    }
 
