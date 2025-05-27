@@ -6,7 +6,7 @@ env_variables:
   TZ: "America/Mexico_City"
   SECRET_KEY: "2c4980313846217b1b163551414fda91e079a23154e7bf5c" #This is the key to encrypt cookies and other data for the user session
   SECONDS_THRESHOLD_UPDATE: 2678000 #31 days
-  NEW_ITINERARIO_RANGE: "!A4:M9"
+  NEW_ITINERARIO_RANGE: "!A1:M9"
   VIAJEROS_RANGE: "!A1:K40"
   EMAILS_RANGE: "!A2:B50"
   PAGOS_RANGE: "!B28:E43"

@@ -91,7 +91,7 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                             all_data=get_data_hl(sheets_service, file_id, tabs_names[i],file_name, multiday)
                             if not all_data:
                                 continue #Nothing to do to this tab, go to next one
-                            keys_to_keep=['guia', 'apoyo','chofer','tour_name','start_date','transporte','num_clientes','multiday','venta','gastos',\
+                            keys_to_keep=['guia', 'apoyo','chofer','tour_name','start_date','transporte','num_clientes','multiday','venta','gastos','tipo_tour','tipo_costos',\
                                           'cobro_efectivo','cobro_transfe','cobro_izettle','cobro_fareharbor','cobro_airbnb','cobro_tripadvisor','cobro_get_your_guide','cobro_otros',\
                                           'combustible','gasto_efectivo','pago_chofer','pago_guia','pago_apoyo','pago_apoyo_2','pago_apoyo_3']
                             logs_data = [all_data[k] for k in keys_to_keep]

@@ -135,7 +135,7 @@ def update_logs(sheets_service,file_id, tab_id, file_name, tab_name, new_row_val
             row[0]=file_name
             row[7]=tab_name
             new_row_values=row+new_row_values
-            range_ = f"{sheet_name}!A{i+1}:AI{i+1}"  # Replace the full row (columns A to AI)
+            range_ = f"{sheet_name}!A{i+1}:AK{i+1}"  # Replace the full row (columns A to AK)
             body = {
                 "values": [new_row_values]
             }
@@ -178,7 +178,7 @@ def inspect_logs(sheets_service,file_id,tab_id, file_name, tab_name, logs_data):
     
 def delete_logs(sheets_service, file_id):
     sheet_name = 'logs'
-    data_range = f'{sheet_name}!A:AI'
+    data_range = f'{sheet_name}!A:AK'
 
     # Get only the required data, skipping the spreadsheet metadata request
     result = sheets_service.spreadsheets().values().get(spreadsheetId=LOG_FILE_ID, range=data_range).execute()
@@ -270,7 +270,7 @@ def get_data_hl(sheets_service, file_id, tab_name,file_name, multiday):
         return
     try:
         # Convert to DataFrame and clean
-        first_sheet_df = DataFrame(values_first_sheet[1:], columns=values_first_sheet[0])
+        first_sheet_df = DataFrame(values_first_sheet[4:], columns=values_first_sheet[3]) #los headers de la tabla están en la fila 3 y la info en la 4
         first_sheet_df = first_sheet_df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
 
@@ -292,7 +292,8 @@ def get_data_hl(sheets_service, file_id, tab_name,file_name, multiday):
     if seconds_since(date_time_end, False) > SECONDS_THRESHOLD_UPDATE:
         print("Start date is set in the past. Skipping event.")
         return
-         
+
+    #Sí es un evento válido, proceed to fetch the rest of the sheets     
     try:
 
         #si son los tabs adicionales de un multiday no se necesita datos de pagos
@@ -306,7 +307,6 @@ def get_data_hl(sheets_service, file_id, tab_name,file_name, multiday):
                 print("No data found in VIAJEROS.")
                 return
         else:  
-            # Step 3: Fetch the remaining sheets since the event is valid
             ranges = [
                 f"VIAJEROS{getenv('VIAJEROS_RANGE')}",
                 f"PAGOS{getenv('PAGOS_RANGE')}",
@@ -352,6 +352,13 @@ def get_data_hl(sheets_service, file_id, tab_name,file_name, multiday):
         # Retain renta_bicis logic
         all_data['renta_bicis'] = first_sheet_df.loc[0, 'Renta de bicis'] if 'Renta de bicis' in first_sheet_df.columns else None
         del first_sheet_df
+
+        #celdas del ITINERARIO con info para contabilidad
+        tipo_tour=values_first_sheet[1][3]
+        tipo_costos=values_first_sheet[1][4]
+        all_data['tipo_tour'] = str(tipo_tour).strip()
+        all_data['tipo_costos'] = str(tipo_costos).strip()
+        del values_first_sheet #just to free up memory
         
     except Exception as e:
         print(f"There's a problem with the dataframe from sheet {tab_name}:", str(e))
@@ -400,6 +407,8 @@ def get_data_hl(sheets_service, file_id, tab_name,file_name, multiday):
         all_data['cobro_tripadvisor'] = None
         all_data['cobro_get_your_guide'] = None
         all_data['cobro_otros'] = None
+        all_data['tipo_tour'] = None
+        all_data['tipo_costos'] = None
 
         return all_data
 
