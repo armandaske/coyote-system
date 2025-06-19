@@ -328,6 +328,7 @@ def get_data_hl(sheets_service, file_id, tab_name,file_name, multiday):
         values_second_sheet = make_square_matrix(values_second_sheet)
         second_sheet_df = DataFrame(values_second_sheet[1:], columns=values_second_sheet[0])
         second_sheet_df = second_sheet_df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+        second_sheet_df = second_sheet_df[~(second_sheet_df['NOMBRE'].isna() | (second_sheet_df['NOMBRE'] == ''))]
 
     except Exception as e:
         print("Error fetching data from sheets VIAJEROS or PAGOS:", str(e))
