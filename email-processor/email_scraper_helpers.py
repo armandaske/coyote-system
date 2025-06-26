@@ -1272,40 +1272,34 @@ def abnb_extract_booking_info_new(soup):
     # Find the string using a regex that captures both "reservaciones más" and "reservación"
     try:        
         anfitrion_element = soup.find('p',string=lambda text: text and "Anfitrión" in text)
-        if anfitrion_element:
-            parent = anfitrion_element.find_parent()
-            h2_before = parent.find_previous("h2")
-            if h2_before:
-                experience_name = h2_before.get_text(strip=True)
+        parent = anfitrion_element.find_parent()
+        h2_before = parent.find_previous("h2")
+        if h2_before:
+            experience_name = h2_before.get_text(strip=True)
     except Exception as e:
         print("Error al extraer experience_name para reservación de airbnb:",str(e))
         return
     try:
         h2_tag_participantes = soup.find("h2", string=lambda t: t and "Participantes" in t)
         # Step 2: Search for the first <p> tag after that <h2>
-        if h2_tag_participantes:
-            # Find the first <p> after the <h2>
-            next_p = h2_tag_participantes.find_next("p")
-            if next_p:
-                # Step 3: Use regex to extract the number before "adultos", "personas", etc.
-                match = re.search(r"(\d+)", next_p.get_text())
-                if match:
-                    number_of_guests = int(match.group(1))
+        next_p = h2_tag_participantes.find_next("p")
+        if next_p:
+            # Step 3: Use regex to extract the number before "adultos", "personas", etc.
+            match = re.search(r"(\d+)", next_p.get_text())
+            if match:
+                number_of_guests = int(match.group(1))
     except Exception as e:
         print("Error al extraer el número de huéspedes:", str(e))
         return
     
     try:
         identidad_p = soup.find("p", string=lambda t: t and "Identidad" in t)
-
-        if identidad_p:
-            # Step 2: Go up to the enclosing <a> tag
-            parent_a = identidad_p.find_parent("a")
-            if parent_a:
-                # Step 3: Find the <h2> within the <a> tag
-                name_h2 = parent_a.find("h2")
-                if name_h2:
-                    names_of_guests = [name_h2.get_text(strip=True)] #I need this to be a list even though it is always only one name
+        parent_a = identidad_p.find_parent("a")
+        if parent_a:
+            # Step 3: Find the <h2> within the <a> tag
+            name_h2 = parent_a.find("h2")
+            if name_h2:
+                names_of_guests = [name_h2.get_text(strip=True)] #I need this to be a list even though it is always only one name
     except Exception as e:
         print("Error al extraer el nombre del huésped:", str(e))
         return
