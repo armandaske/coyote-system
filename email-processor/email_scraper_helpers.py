@@ -13,6 +13,7 @@ unificar_nombres_tours_dict={'La mejor caminata hasta Hierve el Agua y mezcal':'
                     'Ruta ciclista de arte urbano' : 'Street Art Bike Ride',
                     'Paseo en Bicicleta de Arte Urbano' : 'Street Art Bike Ride',
                     'Hike en Hierve y Rincones Secretos + Mezcal' : 'Ultimate Hike Hierve el Agua + Mezcal',
+                    'Ultimate Hierve el Agua hike and Teotitlán' : 'Ultimate Hike Hierve el Agua + Teotitlán',
                     'Hike en Hierve y Rincones Secretos + Tapetes Tradicionales' : 'Ultimate Hike Hierve el Agua + Teotitlán',
                     'Caminata de Arte Urbano' : 'Street Art Walk',
                     'Ultimate Hierve el Agua Hike & Teotitlan Textiles': 'Ultimate Hike Hierve el Agua + Teotitlán',
@@ -468,7 +469,9 @@ def booking_logic(drive_service,sheets_service,msg,platform):
             # Extract guest name, experience name, booking date
             try:
                 if platform=='Airbnb':
-                    extracted_data=abnb_extract_booking_info(soup)
+                    extracted_data=abnb_extract_booking_info_new(soup)
+                    if not extracted_data:
+                        extracted_data=abnb_extract_booking_info(soup)
                     extracted_data['reservation_date']=convert_date_format(msg_date, 6) #UTC-6
                 elif platform=='Fareharbor':
                     extracted_data=fh_extract_booking_info(soup)
@@ -735,7 +738,6 @@ def abnb_extract_booking_info(soup):
     start_date, start_hour, end_date, end_hour = abnb_extract_date_time(event_date_text)
 
     # Extract confirmation_code
-    payments=''
     confirmation_code_text = soup.find(string=re.compile(r"Código de confirmación"))
     if confirmation_code_text:
         #Extract payments
@@ -1265,3 +1267,133 @@ def fh_extract_cancellation_info(soup):
     results_dict = {key: ' '.join(value.split()) if isinstance(value, str) else value for key, value in results_dict.items()}
     results_dict["experience_name"] = unificar_nombres_tours_dict.get(results_dict["experience_name"],results_dict["experience_name"]) #I homologate the tour names here right when i extract it  
     return results_dict
+
+def abnb_extract_booking_info_new(soup):
+    # Find the string using a regex that captures both "reservaciones más" and "reservación"
+    try:        
+        anfitrion_element = soup.find('p',string=lambda text: text and "Anfitrión" in text)
+        if anfitrion_element:
+            parent = anfitrion_element.find_parent()
+            h2_before = parent.find_previous("h2")
+            if h2_before:
+                experience_name = h2_before.get_text(strip=True)
+    except Exception as e:
+        print("Error al extraer experience_name para reservación de airbnb:",str(e))
+        return
+    try:
+        h2_tag_participantes = soup.find("h2", string=lambda t: t and "Participantes" in t)
+        # Step 2: Search for the first <p> tag after that <h2>
+        if h2_tag_participantes:
+            # Find the first <p> after the <h2>
+            next_p = h2_tag_participantes.find_next("p")
+            if next_p:
+                # Step 3: Use regex to extract the number before "adultos", "personas", etc.
+                match = re.search(r"(\d+)", next_p.get_text())
+                if match:
+                    number_of_guests = int(match.group(1))
+    except Exception as e:
+        print("Error al extraer el número de huéspedes:", str(e))
+        return
+    
+    try:
+        identidad_p = soup.find("p", string=lambda t: t and "Identidad" in t)
+
+        if identidad_p:
+            # Step 2: Go up to the enclosing <a> tag
+            parent_a = identidad_p.find_parent("a")
+            if parent_a:
+                # Step 3: Find the <h2> within the <a> tag
+                name_h2 = parent_a.find("h2")
+                if name_h2:
+                    names_of_guests = [name_h2.get_text(strip=True)] #I need this to be a list even though it is always only one name
+    except Exception as e:
+        print("Error al extraer el nombre del huésped:", str(e))
+        return
+    
+    try:
+        h2_tag_confirmation = soup.find("h2", string=lambda t: t and "Código de confirmación" in t)
+        next_p = h2_tag_confirmation.find_next("p")
+        confirmation_code = next_p.get_text(strip=True)
+    except Exception as e:
+        print("Error al extraer el código de confirmación:", str(e))
+        return
+
+    # Extract country using the initial name-country pattern (e.g., "Emily US")
+    country=''
+    img_tag_country = soup.find("img", src=lambda x: x and "e0d89a97-d568-46c0-afe6-747067a8835c.png" in x)
+    # Step 2: From that image, find the next <p> tag
+    if img_tag_country:
+        next_p = img_tag_country.find_next("p")
+        if next_p:
+            country = next_p.get_text(strip=True)
+
+    # Extract event_date
+    h2_tag_date = soup.find("h2", string=lambda t: t and "Fecha y hora" in t)
+    date_time_text = None
+    if h2_tag_date:
+        next_p = h2_tag_date.find_next("p")
+        if next_p:
+            date_time_text = next_p.get_text(strip=True)
+
+    start_date, start_hour, end_date, end_hour = parse_airbnb_datetime(date_time_text)
+
+    # Extract confirmation_code
+    payments=[]
+    pago_element = soup.find(text=re.compile(r'\bIngresos\b'))
+    
+    if pago_element:
+        # Extract the text following 'Pago'
+        text_after_pago = pago_element.find_next('p').text.strip()
+        text_after_pago = text_after_pago.replace(".", "").replace(",",".")
+        payment= convert_currency_to_float(text_after_pago)
+        payment=payment*1.16 #ajustar para los montos extras de IVA y tasas que abona Airbnb, el valor se sacó empíricamente
+        payments=[payment]*number_of_guests
+    else:
+        print("Error. Couldn't find 'Pago' in the airbnb email")
+        
+
+    results_dict={
+        "sales_channel": 'Airbnb',
+        "experience_name": experience_name,
+        "number_of_guests": number_of_guests,
+        "names_of_guests": names_of_guests,
+        "country": country,
+        "start_date": start_date,
+        "start_hour": start_hour,
+        "end_date": end_date,
+        "end_hour": end_hour,
+        "confirmation_code": confirmation_code,
+        "payments": payments
+    }
+    results_dict = {key: ' '.join(value.split()) if isinstance(value, str) else value for key, value in results_dict.items()}
+    results_dict["experience_name"] = unificar_nombres_tours_dict.get(results_dict["experience_name"],results_dict["experience_name"]) #I homologate the tour names here right when i extract it  
+    return results_dict
+
+def parse_airbnb_datetime(datetime_str):
+    meses = {
+        "enero": "01", "febrero": "02", "marzo": "03", "abril": "04",
+        "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
+        "septiembre": "09", "octubre": "10", "noviembre": "11", "diciembre": "12"
+    }
+    try:
+        date_part, time_part = datetime_str.split(" · ")
+        date_part = date_part.split(",")[1].strip()
+        day, _, month, _, year = date_part.replace(",", "").split()
+        month_num = meses[month.lower()]
+        start_date = f"{year}-{month_num}-{int(day):02d}"
+        end_date = start_date  # Assuming the end date is the same as the start date
+
+        start_time_str, end_time_str = time_part.split("–")
+        start_hour = convert_to_24_hour(start_time_str.strip())
+        end_hour = convert_to_24_hour(end_time_str.split(' CT')[0].strip())  # remove 'CT'
+
+        return start_date, start_hour, end_date, end_hour
+    except Exception as e:
+        print("Error parsing datetime:", e)
+        return
+
+def convert_to_24_hour(time_str):
+    #Convert formats like '6:00 a.m.' to '06:00' and '7:00 p.m.' to '19:00'
+    time_str = time_str.replace(" ", "").replace(".", "").replace("a.m", "AM").replace("p.m", "PM")
+    dt = datetime.strptime(time_str.strip(), "%I:%M%p")
+    return dt.strftime("%H:%M")   

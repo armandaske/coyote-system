@@ -7,6 +7,7 @@ from email_scraper_helpers import booking_logic, cancellation_logic, rebooking_l
 
 platforms_by_address_dict={
            'express@airbnb.com' : 'Airbnb',
+           'automated@airbnb.com' : 'Airbnb',
            'messages@fareharbor.com' : 'Fareharbor',
            'info@coyoteaventuras.com' : 'Fareharbor'
           } 
@@ -34,6 +35,8 @@ def get_action_for_email(subject,platform):
 
     if platform.lower() == 'airbnb':
         if 'reservación confirmada para' in subject:
+            return actions['reservacion']
+        elif 'tu experiencia para' in subject:
             return actions['reservacion']
         elif 'booking confirmed' in subject:
             return actions['reservacion']
@@ -72,6 +75,7 @@ def email_scraper_main(drive_service, sheets_service, gmail_service):
     week_before=get_time_week_before()
     queries = {
         f'from:(express@airbnb.com) NOT label:Procesado NOT label:Revisar after:{week_before}',
+        f'from:(automated@airbnb.com) NOT label:Procesado NOT label:Revisar after:{week_before}',
         f'from:(messages@fareharbor.com) NOT label:Procesado NOT label:Revisar after:{week_before}',
         f'from:(info@coyoteaventuras.com) NOT label:Procesado NOT label:Revisar after:{week_before}'
     }
