@@ -6,11 +6,14 @@ from firebase_admin import credentials, firestore, initialize_app
 from os import getenv
 import threading
 import requests
+import logging
 
 app = Flask(__name__)
 # Make sure to set this environment variable
 app.secret_key = str(getenv('SECRET_KEY'))
 PROJECT_ID = str(getenv('PROJECT_ID'))
+
+logging.basicConfig(level=logging.INFO)
 TOPIC_ID = str(getenv('TOPIC_ID'))
 URL = str(getenv('URL'))
 
@@ -32,10 +35,10 @@ watch_request = {
 @app.before_request
 def initialize_all():
     if request.path != '/authorize' and request.path != '/oauth2callback':
-        print('getting credentials')
+        logging.info('getting credentials')
         g.creds = get_creds(firestore_db)
         if not g.creds or not g.creds.valid:
-            print('going to authorize')
+            logging.info('going to authorize')
             return redirect(url_for('authorize'))
 
 
@@ -47,7 +50,7 @@ def home():
 
 @app.route('/authorize')
 def authorize():
-    print('not creds in firestore (refresh_token.json)')
+    logging.info('not creds in firestore (refresh_token.json)')
     flow = get_oauth2_flow()
     authorization_url = flow.authorization_url(
         access_type='offline',
@@ -58,8 +61,8 @@ def authorize():
 
 @app.route('/oauth2callback')
 def oauth2callback():
-    print('oauth2callback')
-    # print(session['origin_route'])
+    logging.info('oauth2callback')
+    # logging.info(session['origin_route'])
     flow = get_oauth2_flow()
     flow.fetch_token(authorization_response=request.url)
     creds = flow.credentials
@@ -87,10 +90,10 @@ def pubsub_endpoint():
                     gmail_service, drive_service, sheets_service, payload)).start()
                 return 'pubsub done', 200
             elif acquire_lock('locked2'):
-                print('other service is updating the database')
+                logging.info('other service is updating the database')
                 return 'Other service is updating the database', 200
             else:
-                print('let call go without processing it')
+                logging.info('let call go without processing it')
                 return '', 204  # Let call go without processing it
         else:
             return 'No message in pubsub data', 400
@@ -109,14 +112,14 @@ def transaction_callback(transaction, doc, field):
     snapshot = doc.get(transaction=transaction)
     if not snapshot.exists or not snapshot.to_dict().get(field):
         transaction.update(doc, {field: True})
-        print(f'{field} set to True')
+        logging.info(f'{field} set to True')
         return True
-    print(f'{field} was already True')
+    logging.info(f'{field} was already True')
     return False
 
 
 def pubsub_handler(gmail_service, drive_service, sheets_service, payload):
-    print(f"Received message: {payload}")
+    logging.info(f"Received message: {payload}")
     locked2 = False
     try:
         #1.  Load previous historyId
@@ -124,7 +127,6 @@ def pubsub_handler(gmail_service, drive_service, sheets_service, payload):
         doc_data = doc.to_dict()
         previous_history_id_raw = doc_data.get("historyId")
         previous_history_id = str(int(previous_history_id_raw.strip()))
-
         # 2. Use users.history.list to get new messages
         response = gmail_service.users().history().list(
             userId='me',
@@ -133,11 +135,11 @@ def pubsub_handler(gmail_service, drive_service, sheets_service, payload):
         ).execute()
 
 
-        #print(f"Response from Gmail API: {response}")
+        logging.info(f"Response from Gmail API: {response}")
         # 3. Process new messages
         if 'history' in response:
             email_scraper_main(drive_service, sheets_service, gmail_service)
-            print('finished email_scraper routine')
+            logging.info('finished email_scraper routine')
 
         # 4. Update historyId in Firestore
         new_history_id = response.get('historyId')
@@ -150,9 +152,10 @@ def pubsub_handler(gmail_service, drive_service, sheets_service, payload):
         locked2 = doc.to_dict().get('locked2')
 
     except Exception as e:
-        print(f"Error in pubsub_handler: {e}")
+        logging.info(f"Error in pubsub_handler: {e}")
 
     finally:
+        logging.info('releasing lock')
         release_lock()
         if locked2:
             payload = {'message': 'new endpoint call from my app'}
@@ -178,7 +181,7 @@ def reset_watch():
         'historyId': watch.get('historyId')
     })
 
-    print(f"Watch started. {watch}")
+    logging.info(f"Watch started. {watch}")
     return 'Watch method reset successfully', 200
 
 
@@ -190,7 +193,7 @@ def stop_watch():
     
     # Detiene el modo watch de la API de Gmail
     stop = gmail_service.users().stop(userId='me').execute()
-    print(stop)
+    logging.info(stop)
     return 'Stop watch method done successfully', 200
 
 

@@ -5,6 +5,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from json import loads
 from os import getenv
+import logging
 #TODO: Pass enviroment variables to google secret manager
 
 # If modifying these SCOPES, delete the stored refresh token.
@@ -23,9 +24,9 @@ def get_creds(firestore_db):
             creds_dict = loads(refresh_token_data['refresh_token'])
             creds = Credentials.from_authorized_user_info(creds_dict, SCOPES)
     if not creds or not creds.valid:
-        print('no creds en el documento o no validas')
+        logging.info('no creds en el documento o no validas')
         if creds and creds.expired and creds.refresh_token:
-            print('refreshing token')
+            logging.info('refreshing token')
             creds.refresh(Request())
             # Save the refresh token in Firestore
             firestore_db.collection('app').document('refresh_token').set({
@@ -35,7 +36,7 @@ def get_creds(firestore_db):
     return creds
 
 def get_oauth2_flow():
-    print('trying to pop the oauth2 flow screen')
+    logging.info('trying to pop the oauth2 flow screen')
     # Initialize the Secret Manager client.
     client = secretmanager.SecretManagerServiceClient()
 

@@ -3,7 +3,7 @@ from email.parser import BytesParser
 from base64 import urlsafe_b64decode
 from re import findall, sub
 from email_scraper_helpers import booking_logic, cancellation_logic, rebooking_logic, other_logic, add_label_to_email, get_label_id, get_current_time, get_time_week_before
-
+import logging
 
 platforms_by_address_dict={
            'express@airbnb.com' : 'Airbnb',
@@ -71,7 +71,7 @@ def email_scraper_main(drive_service, sheets_service, gmail_service):
         revisar_label_id=created_label['id']
         
     current_time_str = get_current_time()
-    print(f"Looking for new emails at: {current_time_str}")
+    logging.info(f"Looking for new emails at: {current_time_str}")
     week_before=get_time_week_before()
     queries = {
         f'from:(express@airbnb.com) NOT label:Procesado NOT label:Revisar after:{week_before}',
@@ -87,7 +87,7 @@ def email_scraper_main(drive_service, sheets_service, gmail_service):
             if messages:
                 for msg in messages:
                     msg_id=str(msg['id'])
-                    print('analizando mensaje',msg_id)
+                    logging.info('analizando mensaje',msg_id)
                     txt = gmail_service.users().messages().get(userId='me', id=msg['id'], format='raw').execute()
                     # Get message payload
                     data = txt['raw']
@@ -105,7 +105,7 @@ def email_scraper_main(drive_service, sheets_service, gmail_service):
                             email_address = email_matches[0]
                             email_address=sub(r'^[^a-zA-Z]+|[^a-zA-Z]+$', '', email_address) #strip non alpha values at beggining and end
                         else:
-                            print("No email address found in the email.")
+                            logging.info("No email address found in the email.")
                             email_address = None
                             
                         subject = msg.get('Subject')
@@ -119,17 +119,17 @@ def email_scraper_main(drive_service, sheets_service, gmail_service):
                             else:
                                 add_label_to_email(gmail_service,'me', msg_id, subject, [procesado_label_id],'Procesado') #label_ids needs to be passed as a list, even if only one element.
                         else:
-                            print(f'Something ocurred when {action} was performed, email with ID:{msg_id}')
+                            logging.info(f'Something ocurred when {action} was performed, email with ID:{msg_id}')
                             add_label_to_email(gmail_service,'me', msg_id, subject, [revisar_label_id], 'Revisar')
                     else:
-                        print(f"Email with ID: {msg_id} is not multipart, it might not contain HTML.")
+                        logging.info(f"Email with ID: {msg_id} is not multipart, it might not contain HTML.")
                         add_label_to_email(gmail_service,'me', msg_id, subject, [revisar_label_id], 'Revisar') 
                         
                 del messages
                 
             else:
-                print("No emails found for that query.")
+                logging.info("No emails found for that query.")
         except Exception as error:
-            print(f'An error occurred in the main process: {error}')
+            logging.info(f'An error occurred in the main process: {error}')
             add_label_to_email(gmail_service,'me', msg_id, subject, [revisar_label_id], 'Revisar')
     return    
