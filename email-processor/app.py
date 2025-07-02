@@ -82,9 +82,9 @@ def pubsub_endpoint():
         if 'message' in data:
             payload = data['message']
             del data
-            gmail_service = build('gmail', 'v1', credentials=g.creds)
-            drive_service = build('drive', 'v3', credentials=g.creds)
-            sheets_service = build('sheets', 'v4', credentials=g.creds)
+            gmail_service = build('gmail', 'v1', credentials=g.creds, cache_discovery=False)
+            drive_service = build('drive', 'v3', credentials=g.creds, cache_discovery=False)
+            sheets_service = build('sheets', 'v4', credentials=g.creds, cache_discovery=False)
             if acquire_lock('locked'):
                 threading.Thread(target=pubsub_handler, args=(
                     gmail_service, drive_service, sheets_service, payload)).start()
@@ -173,7 +173,7 @@ def release_lock():
 
 @app.route('/reset-watch')
 def reset_watch():
-    gmail_service = build('gmail', 'v1', credentials=g.creds)
+    gmail_service = build('gmail', 'v1', credentials=g.creds, cache_discovery=False)
     watch = gmail_service.users().watch(userId='me', body=watch_request).execute()
 
     # Save the historyId to Firestore
@@ -189,7 +189,7 @@ def reset_watch():
 @app.route('/stop-watch')
 def stop_watch():
     # Execute the watch request
-    gmail_service = build('gmail', 'v1', credentials=g.creds)
+    gmail_service = build('gmail', 'v1', credentials=g.creds, cache_discovery=False)
     
     # Detiene el modo watch de la API de Gmail
     stop = gmail_service.users().stop(userId='me').execute()
