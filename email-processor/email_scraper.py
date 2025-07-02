@@ -87,7 +87,7 @@ def email_scraper_main(drive_service, sheets_service, gmail_service):
             if messages:
                 for msg in messages:
                     msg_id=str(msg['id'])
-                    logging.info('analizando mensaje',msg_id)
+                    logging.info('analizando mensaje %s',msg_id)
                     txt = gmail_service.users().messages().get(userId='me', id=msg['id'], format='raw').execute()
                     # Get message payload
                     data = txt['raw']

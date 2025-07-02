@@ -23,6 +23,7 @@ unificar_nombres_tours_dict={'La mejor caminata hasta Hierve el Agua y mezcal':'
                     'Hike & Swim in the Mixteca Region, Apoala Waterfalls' : 'Hike + Swim at Apoala Waterfalls',
                     'Camina y Nada en las Increíbles Cascadas de Santiago Apoala': 'Hike + Swim at Apoala Waterfalls',
                     'Caminata y baño en las cascadas de Apoala' : 'Hike + Swim at Apoala Waterfalls',
+                    'Paseo en bicis de arte urbano' : 'Street Art Bike Ride',
                     
                    }
 
