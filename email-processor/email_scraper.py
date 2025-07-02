@@ -40,8 +40,10 @@ def get_action_for_email(subject,platform):
             return actions['reservacion']
         elif 'booking confirmed' in subject:
             return actions['reservacion']
-        elif 'tuvo que cancelar su' in subject:
+        elif 'canceló' in subject:
             return actions['cancelacion']
+        elif 'tuvo que cancelar su' in subject:
+            return actions['cancelacion']        
         elif 'had to cancel' in subject:
             return actions['cancelacion']
         elif 'rebooked' in subject:

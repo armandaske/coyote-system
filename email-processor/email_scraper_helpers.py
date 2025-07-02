@@ -636,9 +636,11 @@ def cancellation_logic(drive_service,sheets_service,msg,platform):
         if (part.get_content_type() == 'text/html'):
             soup=get_soup(part,charset)
             # Extract guest name, experience name, booking 
-            try:
+            try:               
                 if platform=='Airbnb':
-                    extracted_data=abnb_extract_cancellation_info(soup)
+                    extracted_data=abnb_extract_cancellation_info_new(soup)
+                    if not extracted_data:
+                        extracted_data=abnb_extract_cancellation_info(soup)
                 elif platform=='Fareharbor':
                     extracted_data=fh_extract_cancellation_info(soup)
                 guest_name=extracted_data.get('guest_name')
@@ -1365,6 +1367,60 @@ def abnb_extract_booking_info_new(soup):
     results_dict = {key: ' '.join(value.split()) if isinstance(value, str) else value for key, value in results_dict.items()}
     results_dict["experience_name"] = unificar_nombres_tours_dict.get(results_dict["experience_name"],results_dict["experience_name"]) #I homologate the tour names here right when i extract it  
     return results_dict
+
+
+def abnb_extract_cancellation_info_new(soup):
+    # Extracting guest_name: Text before 'no podrán asistir' or 'no podrá asistir'
+    guest_name_tag = soup.find("h1", text=re.compile(r"canceló", re.IGNORECASE))
+    if guest_name_tag:
+        guest_name_text = guest_name_tag.get_text(strip=True)
+    try:
+        guest_name = guest_name_text.split()[0].strip()
+    except Exception:
+        print('no se encontró nombre en correo de cancelación de Airbnb')
+        return
+
+    # Extracting remaining text after 'experiencia'
+    try:
+        anfitrion_p = soup.find("p",string=re.compile(r"Anfitrión"))
+
+        experience_name = None
+        tour_date_text = None
+
+        if anfitrion_p:
+                # Get all previous <p> tags and take the last one before 'Anfitrión'
+            previous_ps = anfitrion_p.find_all_previous("p")
+            if previous_ps:
+                experience_name = previous_ps[0].get_text(strip=True)  # First match in reverse order = closest above
+
+            # Get the next <p> tag (date)
+            next_p = anfitrion_p.find_next("p")
+            if next_p:
+                day_text = next_p.get_text(strip=True)
+                day_text = day_text+" de "+str(datetime.now().year) #I add the current year to the date, since it is not included in the email
+
+            next_next_p = next_p.find_next("p")
+            if next_next_p:
+                hour_text = next_next_p.get_text(strip=True)
+                hour_text = hour_text.split(" · ")[0]  # Take only the first part before number of guests
+            tour_date_text = day_text + " · " + hour_text + " – 1:00 p.m. CT" #I add a random end time of 1:00 p.m. CT, since it is not included in the email and needed for the parser
+            # Parse the date and time
+            start_date, start_hour, end_date, end_hour = parse_airbnb_datetime(tour_date_text)
+
+    except Exception:
+        print('no se encontró experiencia o fecha en correo de cancelación de Airbnb')
+        return
+    
+    results_dict= {
+        "sales_channel": 'Airbnb',
+        "guest_name": guest_name,
+        "experience_name": experience_name,
+        "start_date": start_date
+    }
+    results_dict = {key: ' '.join(value.split()) if isinstance(value, str) else value for key, value in results_dict.items()}
+    results_dict["experience_name"] = unificar_nombres_tours_dict.get(results_dict["experience_name"],results_dict["experience_name"]) #I homologate the tour names here right when i extract it  
+    return results_dict
+
 
 def parse_airbnb_datetime(datetime_str):
     meses = {
