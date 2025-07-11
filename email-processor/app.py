@@ -24,11 +24,12 @@ cred = credentials.ApplicationDefault()
 initialize_app(cred)
 del cred
 firestore_db = firestore.client()  # my firebase database
-# Set up watch request
+
+# Set up watch request. Previously I only passed the topicName, but now I also pass labelIds and labelFilterBehavior
 watch_request = {
-    #'labelIds': ['UNREAD'], #UNREAD, INBOX
+    'labelIds': ['UNREAD'], #UNREAD, INBOX
     'topicName': f'projects/{PROJECT_ID}/topics/{TOPIC_ID}',
-    #'labelFilterBehavior': 'INCLUDE'
+    'labelFilterBehavior': 'INCLUDE'
 }
 
 

@@ -392,7 +392,7 @@ def find_and_cancel(service, file_id, guest_name, number_of_guests, sales_channe
         matching_rows = [i for i, row in enumerate(values) if row and guest_name in row[name_col_index] and row[sales_channel_col_index] == sales_channel]
         number_of_guests = len(matching_rows) #because for airbnb the email doesn't specify the number of guests
     else: #if it's not Airbnb, it's Fareharbor, so i look for the reservation code
-        matching_rows = [i for i, row in enumerate(values) if row and row[reservation_col_index] == reservation_code and row[sales_channel_col_index] == sales_channel]
+        matching_rows = [i for i, row in enumerate(values) if row and row[reservation_col_index] == reservation_code] #and row[sales_channel_col_index] == sales_channel
     # If there's only one match, initiate the cancellation process
     if len(matching_rows) == 1:
         row_to_cancel= "VIAJEROS!"+number_to_letter(status_col_index+1)+str(matching_rows[0]+1) #Sé que hago muchas mierdas aquí pero ya lo quiero acabar
