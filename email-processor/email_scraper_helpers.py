@@ -521,7 +521,7 @@ def booking_logic(drive_service,sheets_service,msg,platform):
         try:
             raw_file_name_ = 'BASE'+' '+experience_name
             file_name_ = clean_filename(raw_file_name_)
-            folders_=['Workflow Coyote Armando Technologies', year,'Bases HL']
+            folders_=['Workflow Coyote Armando Technologies', 'Bases HL']
             all_folders_found_, folder_id_, folder_name_=find_last_subfolder_id(drive_service, folders_)
             if all_folders_found_:
                 pass
