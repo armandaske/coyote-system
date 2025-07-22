@@ -10,6 +10,7 @@ OTRO_FILE_ID = str(getenv('OTRO_FILE_ID'))
 
 unificar_nombres_tours_dict={'La mejor caminata hasta Hierve el Agua y mezcal':'Ultimate Hike Hierve el Agua + Mezcal',
                     'Caminata Ultimate Hierve el Agua + Mezcal':'Ultimate Hike Hierve el Agua + Mezcal',
+                    'Ultimate Hierve el Agua hike and Mezcal': 'Ultimate Hike Hierve el Agua + Mezcal',
                     'Ruta ciclista de arte urbano' : 'Street Art Bike Ride',
                     'Paseo en Bicicleta de Arte Urbano' : 'Street Art Bike Ride',
                     'Hike en Hierve y Rincones Secretos + Mezcal' : 'Ultimate Hike Hierve el Agua + Mezcal',
@@ -783,7 +784,7 @@ def abnb_extract_booking_info(soup):
     results_dict["experience_name"] = unificar_nombres_tours_dict.get(results_dict["experience_name"],results_dict["experience_name"]) #I homologate the tour names here right when i extract it  
     return results_dict
 
-def fh_extract_booking_info(soup):             
+def fh_extract_booking_info(soup):           
     # Find the element containing the string "Created by:" (without the trailing space)
     created_by_element = soup.find(string=re.compile("Created by:|Rebooked by:",re.IGNORECASE))
     created_at_element = soup.find(string=re.compile("Created at:|Rebooked at:",re.IGNORECASE))
@@ -795,7 +796,6 @@ def fh_extract_booking_info(soup):
     if created_by_element:
         # Using the parent tag to locate the next sibling containing the created_by text
         parent_tag = created_by_element.find_parent()
-        
         # Extract the created_by from the text of the next sibling
         if parent_tag:
             next_sibling = parent_tag.find_next_sibling(string=True)
@@ -804,7 +804,6 @@ def fh_extract_booking_info(soup):
     if created_at_element:
         # Using the parent tag to locate the next sibling containing the created_at text
         parent_tag = created_at_element.find_parent()
-        
         # Extract the created_at from the text of the next sibling
         if parent_tag:
             next_sibling = parent_tag.find_next_sibling(string=True)
@@ -836,8 +835,7 @@ def fh_extract_booking_info(soup):
             for element in experience_name_section:
                 if padding_bottom_pattern.search(element['style']):
                     experience_string = element
-                    break
-        
+                    break   
     experience_name=experience_string.get_text(strip=True) if experience_string else 'Sin nombre'     
     date_raw = date_string.strip() if date_string else ''
     start_date, start_hour, end_date, end_hour = fh_extract_date_time(date_raw)
@@ -880,13 +878,15 @@ def fh_extract_booking_info(soup):
         #get names
         names_elements = correct_table.find_all('b', string="Full name:")
         names_of_guests = [elem.parent.get_text(strip=True).replace('Full name:', '').strip() for elem in names_elements]
-
         if number_of_guests<len(names_of_guests):
             number_of_guests=len(names_of_guests)
 
         #get due amount
         due_element = soup.find('b', string="Due:")
-        due_amount=convert_currency_to_float(due_element.parent.get_text(strip=True).split(':')[1])
+        if due_element:
+            due_amount=convert_currency_to_float(due_element.parent.get_text(strip=True).split(':')[1])
+        else:
+            due_amount=0
         due_amount_per_guest=due_amount/number_of_guests
 
          #get amount paid
@@ -900,11 +900,9 @@ def fh_extract_booking_info(soup):
         ages_elements = correct_table.find_all('b', string="Age:")   
         ages = [elem.parent.get_text(strip=True).replace('Age:', '').strip() for elem in ages_elements]
         ages.extend([''] * (len(names_of_guests) - len(ages))) #in case there are  more 
-        
         #get country
         country_element = correct_table.find('b',string=re.compile("Where do you visit us from?"))
-        country = country_element.parent.get_text(strip=True).split(':')[1].strip() if country_element else '' 
-        
+        country = country_element.parent.get_text(strip=True).split(':')[1].strip() if country_element else ''
         #Get all the other comments/observations and save them in a dictionary
         try:
             rows = correct_table.find_all('tr')
@@ -1415,7 +1413,8 @@ def abnb_extract_cancellation_info_new(soup):
         "sales_channel": 'Airbnb',
         "guest_name": guest_name,
         "experience_name": experience_name,
-        "start_date": start_date
+        "start_date": start_date,
+        "start_hour": start_hour
     }
     results_dict = {key: ' '.join(value.split()) if isinstance(value, str) else value for key, value in results_dict.items()}
     results_dict["experience_name"] = unificar_nombres_tours_dict.get(results_dict["experience_name"],results_dict["experience_name"]) #I homologate the tour names here right when i extract it  
