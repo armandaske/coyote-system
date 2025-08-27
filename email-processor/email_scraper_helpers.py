@@ -893,9 +893,10 @@ def fh_extract_booking_info(soup):
         payment_elements = correct_table.find_all('span', string=re.compile("General Ticket|Private Group", re.IGNORECASE)) 
         if not payment_elements:
             payment_elements = correct_table.find_all('b', string=re.compile(r"\bTotal\b", re.IGNORECASE)) 
-
-        payments=[convert_currency_to_float(payment.find_next('td').get_text(strip=True))-due_amount_per_guest for payment in payment_elements]
-
+        try:
+            payments=[convert_currency_to_float(payment.find_next('td').get_text(strip=True))-due_amount_per_guest for payment in payment_elements]
+        except:
+            payments=[0 for payment in payment_elements]
         #get ages
         ages_elements = correct_table.find_all('b', string="Age:")   
         ages = [elem.parent.get_text(strip=True).replace('Age:', '').strip() for elem in ages_elements]
