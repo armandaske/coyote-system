@@ -1283,7 +1283,7 @@ def abnb_extract_booking_info_new(soup):
         print("Error al extraer experience_name para reservación de airbnb:",str(e))
         return
     try:
-        h2_tag_participantes = soup.find("h2", string=lambda t: t and "Participantes" in t)
+        h2_tag_participantes = soup.find("h2", string=lambda t: t and ("Participantes" in t or "Participante" in t))
         # Step 2: Search for the first <p> tag after that <h2>
         next_p = h2_tag_participantes.find_next("p")
         if next_p:
