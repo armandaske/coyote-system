@@ -853,9 +853,9 @@ def make_square_matrix(matrix): #TODO: checar cómo se ve matrix y ver si se pue
                 row.append(None)
     return matrix
         
-def store_state(current_time,change_time,page_token, firestore_db):
+def store_state(current_time,page_token, firestore_db):
     # Store the 'last_page_token' in the 'state' document of the 'app' collection
-    firestore_db.collection('app').document('state').set({'last_page_token': page_token,'last_processed_change_time':change_time,'retrieve_time': current_time}, merge=True)
+    firestore_db.collection('app').document('state').set({'last_page_token': page_token,'retrieve_time': current_time}, merge=True)
         
 
 def get_last_state(firestore_db):
@@ -867,7 +867,7 @@ def get_last_state(firestore_db):
         return state_doc.to_dict()
     else:
         # If the document does not exist, return None
-        return {'last_page_token': None,'last_processed_change_time':None,'retrieve_time': None }
+        return {'last_page_token': None,'retrieve_time': None }
 
 def find_folder(drive_service, month, parent_folder_id):
     query = f"'{parent_folder_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed=false"
