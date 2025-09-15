@@ -5,8 +5,15 @@ from os import getenv
 from googleapiclient import errors
 from json import dumps
 #TODO: cuando se hayan homologado todas las hojas logisticas quitar la opcion de pickup en write viajeros. 
+#TODO: sacar logica de cancelacion y rebooking para write_cash. Solo sería poner el total_paid en negativo
+#TODO: sacar logica de cash para airbnb
 
 OTRO_FILE_ID = str(getenv('OTRO_FILE_ID'))
+COYOTE_CASH_FILE_ID = str(getenv('COYOTE_CASH_FILE_ID'))
+FAREHARBOR_FEE = float(getenv('FAREHARBOR_FEE'))
+AIRBNB_FEE = float(getenv('AIRBNB_FEE'))
+
+
 
 unificar_nombres_tours_dict={'La mejor caminata hasta Hierve el Agua y mezcal':'Ultimate Hike Hierve el Agua + Mezcal',
                     'Caminata Ultimate Hierve el Agua + Mezcal':'Ultimate Hike Hierve el Agua + Mezcal',
@@ -47,7 +54,7 @@ def get_current_time():
     current_time_mexico = current_time_utc.astimezone(mexico_city_offset)
     
     # Format the time as a string
-    current_time_str = current_time_mexico.strftime("%Y-%m-%d -> %H:%M:%S")
+    current_time_str = current_time_mexico.strftime("%d/%m/%Y %H:%M:%S")
     
     return current_time_str
 
@@ -77,7 +84,7 @@ def reformat_date(date_str):
         month, day, year = match.groups()
 
         # Swap the month and day
-        swapped_date = f"{year}/{month}/{day}"
+        swapped_date = f"{day}/{month}/{year}"
 
         # Replace the original date with the swapped date in the input string
         swapped_date_str = re.sub(pattern, swapped_date, date_str)
@@ -128,6 +135,29 @@ def update_numeration(sheets_service,file_id):
     result = sheets_service.spreadsheets().values().update(spreadsheetId=file_id, range=range_to_update,
                                    valueInputOption="RAW", body=body).execute()
     return
+
+def write_cash(sheets_service, cash_dict,  file_id):
+    try:
+        sheet_name = 'Transacciones'
+        values_to_append = [cash_dict['fecha'], cash_dict['tipo'], cash_dict['cantidad'], cash_dict['origen'], cash_dict['destino'], cash_dict['forma_de_pago'],\
+                            cash_dict['descripcion'], cash_dict['codigo_reservacion'], cash_dict['observaciones'], cash_dict['timestamp'],cash_dict['input']]
+        
+        value_range_body = {
+            "majorDimension": "ROWS",  # "ROWS"|"COLUMNS"
+            "values": [values_to_append]
+        }     
+        
+        request = sheets_service.spreadsheets().values().append(spreadsheetId=file_id, 
+                                                                range=sheet_name, 
+                                                                valueInputOption='USER_ENTERED', #or 'RAW'
+                                                                body=value_range_body).execute()
+        if request:
+            print('Transaccion added to ledger')
+        else:
+            print('Transaccion was NOT added to ledger')
+    except Exception as e:
+        print(f"An error occurred while writing to cash ledger: {e}")
+    
 
 def write_viajeros(sheets_service, list_of_viajero_dicts, file_id):
     sheet_name = 'VIAJEROS'  # replace with your sheet name
@@ -332,6 +362,7 @@ def get_month_from_date(date):
 
 def dicts_from_extracted_data(extracted_data):  
     list_of_viajero_dicts=[]
+
     for i in range(extracted_data.get('number_of_guests')):
         if len(extracted_data.get('names_of_guests'))>i:
             name=extracted_data.get('names_of_guests')[i]
@@ -359,6 +390,7 @@ def dicts_from_extracted_data(extracted_data):
         "reservation_date": extracted_data.get('reservation_date','')
         }
         list_of_viajero_dicts.append(viajero_dict)
+
     itinerario_dict={
         "experience_name": extracted_data['experience_name'], 
         "start_date": extracted_data["start_date"],
@@ -366,7 +398,21 @@ def dicts_from_extracted_data(extracted_data):
         "end_date": extracted_data["end_date"],
         "end_hour": extracted_data["end_hour"]
     }
-    return (itinerario_dict,list_of_viajero_dicts)
+
+    cash_dict={
+        "fecha": extracted_data.get('reservation_date',get_current_time()).split()[0],
+        "tipo": "Ingreso" if extracted_data.get('total_price',0)>=0 else "Egreso",
+        "cantidad": abs(extracted_data.get('total_price',0)),
+        "origen": "Externo" if extracted_data.get('total_price',0)>=0 else "Origami",
+        "destino": "Origami" if extracted_data.get('total_price',0)>=0 else "Externo",
+        "forma_de_pago": extracted_data.get('sales_channel',''),
+        "descripcion":('Cancelación de ' if extracted_data.get('total_price',0)<0 else 'Reserva de ')+f"{extracted_data.get('experience_name','')} {extracted_data.get('start_date','')} x{extracted_data.get('number_of_guests',1)}",
+        "codigo_reservacion": extracted_data.get('confirmation_code',''),
+        "observaciones": '',
+        "timestamp": get_current_time(),
+        "input": 'Automático'
+    }
+    return (itinerario_dict,list_of_viajero_dicts,cash_dict)
 
 
 def find_and_cancel(service, file_id, guest_name, number_of_guests, sales_channel, reservation_code, status_value):
@@ -482,7 +528,7 @@ def booking_logic(drive_service,sheets_service,msg,platform):
                 start_date = extracted_data.get('start_date')
                 start_hour = extracted_data.get('start_hour')
                 experience_name = extracted_data.get('experience_name') 
-                itinerario_dict,list_of_viajero_dicts=dicts_from_extracted_data(extracted_data)    
+                itinerario_dict,list_of_viajero_dicts,cash_dict=dicts_from_extracted_data(extracted_data)    
             except Exception as error:
                 print("The specified element was not found in the HTML for booking logic",str(error))
                 return
@@ -557,6 +603,7 @@ def booking_logic(drive_service,sheets_service,msg,platform):
         print(f'New file created: {file_name} id:{file_id}')
         write_itinerario(sheets_service, itinerario_dict, file_id)    
         write_viajeros(sheets_service, list_of_viajero_dicts, file_id)
+        write_cash(sheets_service, cash_dict, COYOTE_CASH_FILE_ID)
         print('Itinerario and Viajeros information added to new file')
 
     #The file already exists, just fill the new bookings of the viajeros sheet
@@ -564,6 +611,7 @@ def booking_logic(drive_service,sheets_service,msg,platform):
         print(f'Adding new reservations to file {file_name}')
         update_numeration(sheets_service, file_id[0])  #If there's more than 1 file with the same name i use the most recently created one
         write_viajeros(sheets_service, list_of_viajero_dicts, file_id[0])
+        write_cash(sheets_service, cash_dict, COYOTE_CASH_FILE_ID)
 
     return True
 
@@ -974,6 +1022,7 @@ def fh_extract_booking_info(soup):
         "names_of_guests": names_of_guests, 
         "ages": ages,
         "payments": payments,
+        "total_price": sum(payments)*(1-FAREHARBOR_FEE),
         "phone": phone,
         "email": email,
         "comments": comments_string
