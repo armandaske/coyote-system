@@ -70,7 +70,7 @@ def convert_currency_to_float(currency_str):
     if re.search(r"\$([\d,]+\.?\d{0,2})", currency_str):
         return float(re.search(r"\$([\d,]+\.?\d{0,2})", currency_str).group(1).replace(',', ''))
     else:
-        return ''
+        return 0.0
     
     
 def reformat_date(date_str):
@@ -399,8 +399,11 @@ def dicts_from_extracted_data(extracted_data):
         "end_hour": extracted_data["end_hour"]
     }
 
-    cash_dict={
-        "fecha": extracted_data.get('reservation_date',get_current_time()).split()[0],
+    return (itinerario_dict,list_of_viajero_dicts)
+
+def get_cash_dict(extracted_data):
+    cash_dict={ 
+        "fecha": extracted_data.get('reservation_date',get_current_time()).split()[0], #Even if it's cancellation I kept the name reservation_date
         "tipo": "Ingreso" if extracted_data.get('total_price',0)>=0 else "Egreso",
         "cantidad": abs(extracted_data.get('total_price',0)),
         "origen": "Externo" if extracted_data.get('total_price',0)>=0 else "Origami",
@@ -412,7 +415,8 @@ def dicts_from_extracted_data(extracted_data):
         "timestamp": get_current_time(),
         "input": 'Automático'
     }
-    return (itinerario_dict,list_of_viajero_dicts,cash_dict)
+
+    return cash_dict
 
 
 def find_and_cancel(service, file_id, guest_name, number_of_guests, sales_channel, reservation_code, status_value):
@@ -528,7 +532,9 @@ def booking_logic(drive_service,sheets_service,msg,platform):
                 start_date = extracted_data.get('start_date')
                 start_hour = extracted_data.get('start_hour')
                 experience_name = extracted_data.get('experience_name') 
-                itinerario_dict,list_of_viajero_dicts,cash_dict=dicts_from_extracted_data(extracted_data)    
+                itinerario_dict,list_of_viajero_dicts=dicts_from_extracted_data(extracted_data)    
+                cash_dict=get_cash_dict(extracted_data)
+
             except Exception as error:
                 print("The specified element was not found in the HTML for booking logic",str(error))
                 return
@@ -699,6 +705,7 @@ def cancellation_logic(drive_service,sheets_service,msg,platform):
                 start_hour=extracted_data.get('start_hour')
                 confirmation_code=extracted_data.get('confirmation_code')
                 sales_channel=extracted_data.get('sales_channel')
+
             except Exception as error:
                 print("The specified element was not found in the HTML for cancellation logic",str(error))
                 return
@@ -727,6 +734,8 @@ def cancellation_logic(drive_service,sheets_service,msg,platform):
         for id_ in file_id:
             cancelled=find_and_cancel(sheets_service, id_, guest_name, number_of_guests, sales_channel,confirmation_code,"CANCELADO🚫")
             if cancelled:
+                cash_dict=get_cash_dict(extracted_data)
+                write_cash(sheets_service,cash_dict, COYOTE_CASH_FILE_ID)
                 break
     if not cancelled:
         if sales_channel == 'Airbnb':
@@ -1253,6 +1262,23 @@ def abnb_extract_cancellation_info(soup):
     return results_dict
 
 def fh_extract_cancellation_info(soup): 
+    # Find the element containing the string "Ccancelled at:" (without the trailing space)
+    cancelled_at_element = soup.find(string=re.compile("Cancelled at:",re.IGNORECASE))
+    
+    # Initialize cancelled_at variable
+    cancelled_at= ''
+    
+    if cancelled_at_element:
+        # Using the parent tag to locate the next sibling containing the cancelled_at text
+        parent_tag = cancelled_at_element.find_parent()
+        # Extract the cancelled_at from the text of the next sibling
+        if parent_tag:
+            next_sibling = parent_tag.find_next_sibling(string=True)
+            if next_sibling:
+                cancelled_at = next_sibling.strip()
+                cancelled_at=reformat_date(cancelled_at)
+
+
     # Initialize confirmation_code variable
     confirmation_code = ''
     date_string=''
@@ -1293,7 +1319,8 @@ def fh_extract_cancellation_info(soup):
     is_private_tour= soup.find('div', string=re.compile("PRIVATE TOUR|PRIVATE GROUP", re.IGNORECASE))
     if is_private_tour:
         experience_name+=' PRIVADO'
-    
+
+    """
     # Extract names_of_guests and ages from the correct table
     details_h2 = soup.find('h2', string="Details")
     correct_table = details_h2.find_next_sibling('table') if details_h2 else ''
@@ -1306,7 +1333,16 @@ def fh_extract_cancellation_info(soup):
         if name_section:
             names_of_guests= [name_section.parent.get_text(strip=True).replace('Name:', '').strip()]
         else:
-            names_of_guests = ['']          
+            names_of_guests = ['']        
+    """  
+    
+    #get due amount
+    due_element = soup.find('b', string="Due:")
+    if due_element:
+        due_amount=convert_currency_to_float(due_element.parent.get_text(strip=True).split(':')[1])
+    else:
+        due_amount=0
+        
                  
     results_dict={
         "sales_channel": 'Fareharbor',
@@ -1315,7 +1351,9 @@ def fh_extract_cancellation_info(soup):
         "start_date": start_date,
         "start_hour": start_hour,
         "number_of_guests" : number_of_guests,
-        "guest_name": names_of_guests[0],     
+        "guest_name": '', #names_of_guests[0],     
+        "reservation_date": cancelled_at, #I know its not the reservatin date but that's how cash_dict is structured
+        "total_price": -due_amount*(1-FAREHARBOR_FEE) #The amount to reinburse is the due amount, keeping the name for consistency 
     }
     results_dict = {key: ' '.join(value.split()) if isinstance(value, str) else value for key, value in results_dict.items()}
     results_dict["experience_name"] = unificar_nombres_tours_dict.get(results_dict["experience_name"],results_dict["experience_name"]) #I homologate the tour names here right when i extract it  
