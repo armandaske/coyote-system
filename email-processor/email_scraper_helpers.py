@@ -609,6 +609,7 @@ def booking_logic(drive_service,sheets_service,msg,platform):
         print(f'New file created: {file_name} id:{file_id}')
         write_itinerario(sheets_service, itinerario_dict, file_id)    
         write_viajeros(sheets_service, list_of_viajero_dicts, file_id)
+        cash_dict['observaciones'] = f"https://docs.google.com/spreadsheets/d/{file_id}" #I add the file id to the observations of the cash entry so I can track it later if needed
         write_cash(sheets_service, cash_dict, COYOTE_CASH_FILE_ID)
         print('Itinerario and Viajeros information added to new file')
 
@@ -617,6 +618,7 @@ def booking_logic(drive_service,sheets_service,msg,platform):
         print(f'Adding new reservations to file {file_name}')
         update_numeration(sheets_service, file_id[0])  #If there's more than 1 file with the same name i use the most recently created one
         write_viajeros(sheets_service, list_of_viajero_dicts, file_id[0])
+        cash_dict['observaciones'] = f"https://docs.google.com/spreadsheets/d/{file_id[0]}" #I add the file id to the observations of the cash entry so I can track it later if needed
         write_cash(sheets_service, cash_dict, COYOTE_CASH_FILE_ID)
 
     return True
@@ -735,6 +737,7 @@ def cancellation_logic(drive_service,sheets_service,msg,platform):
             cancelled=find_and_cancel(sheets_service, id_, guest_name, number_of_guests, sales_channel,confirmation_code,"CANCELADO🚫")
             if cancelled:
                 cash_dict=get_cash_dict(extracted_data)
+                cash_dict['observaciones'] = f"https://docs.google.com/spreadsheets/d/{id_}" #I add the file id to the observations of the cash entry so I can track it later if needed
                 write_cash(sheets_service,cash_dict, COYOTE_CASH_FILE_ID)
                 break
     if not cancelled:
