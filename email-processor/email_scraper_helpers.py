@@ -406,8 +406,8 @@ def get_cash_dict(extracted_data):
         "fecha": extracted_data.get('reservation_date',get_current_time()).split()[0], #Even if it's cancellation I kept the name reservation_date
         "tipo": "Ingreso" if extracted_data.get('total_price',0)>=0 else "Egreso",
         "cantidad": abs(extracted_data.get('total_price',0)),
-        "origen": "Externo" if extracted_data.get('total_price',0)>=0 else "Origami",
-        "destino": "Origami" if extracted_data.get('total_price',0)>=0 else "Externo",
+        "origen": "Externo" if extracted_data.get('total_price',0)>=0 else "Origamy",
+        "destino": "Origamy" if extracted_data.get('total_price',0)>=0 else "Externo",
         "forma_de_pago": extracted_data.get('sales_channel',''),
         "descripcion":('Cancelación de ' if extracted_data.get('total_price',0)<0 else 'Reserva de ')+f"{extracted_data.get('experience_name','')} {extracted_data.get('start_date','')} x{extracted_data.get('number_of_guests',1)}",
         "codigo_reservacion": extracted_data.get('confirmation_code',''),
@@ -544,7 +544,7 @@ def booking_logic(drive_service,sheets_service,msg,platform):
         file_name = clean_filename(raw_file_name)
         year= get_year_from_date(start_date)
         month= get_month_from_date(start_date)
-        folders=['Workflow Coyote Armando Technologies', year,'Hojas Logísticas', month]
+        folders=['Workflow Coyote Armando Technologies','Hojas Logísticas', year, month]
         all_folders_found, folder_id, folder_name=find_last_subfolder_id(drive_service, folders)
         if all_folders_found:
             pass
@@ -649,7 +649,7 @@ def rebooking_logic(drive_service, sheets_service, msg, platform):
         old_file_name = clean_filename(raw_old_file_name)
         old_year= get_year_from_date(old_start_date)
         old_month= get_month_from_date(old_start_date)
-        folders=["Workflow Coyote Armando Technologies", old_year,'Hojas Logísticas', old_month]
+        folders=['Workflow Coyote Armando Technologies', 'Hojas Logísticas', old_year, old_month]
         all_folders_found, old_folder_id, old_folder_name=find_last_subfolder_id(drive_service, folders)
         if all_folders_found:
             old_file_id=find_existing_file( drive_service,old_file_name, old_folder_id)           
@@ -716,7 +716,7 @@ def cancellation_logic(drive_service,sheets_service,msg,platform):
         file_name = clean_filename(raw_file_name)
         year= get_year_from_date(start_date)
         month= get_month_from_date(start_date)
-        folders=['Workflow Coyote Armando Technologies', year,'Hojas Logísticas', month]
+        folders=['Workflow Coyote Armando Technologies', 'Hojas Logísticas', year, month]
         all_folders_found, folder_id, folder_name=find_last_subfolder_id(drive_service, folders)
         if all_folders_found:
             file_id=find_existing_file(drive_service,file_name, folder_id)           

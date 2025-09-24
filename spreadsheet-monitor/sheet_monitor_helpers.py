@@ -578,7 +578,7 @@ def create_photos_folder(drive_service,file_name,tab_name):
     try:     
         file_month=get_month_from_file_name(file_name)
         file_year=get_year_from_file_name(file_name)
-        folders=['Workflow Coyote Armando Technologies', file_year,'Fotos Tours', file_month]
+        folders=['Workflow Coyote Armando Technologies', 'Fotos Tours',file_year, file_month]
         all_folders_found, last_folder_id, last_folder_name=find_last_subfolder_id(drive_service, folders)
         if all_folders_found:
             month_folder_id=last_folder_id

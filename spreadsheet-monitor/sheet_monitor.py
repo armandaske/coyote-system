@@ -68,8 +68,8 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
 
                     directory_tree = [
                         "Workflow Coyote Armando Technologies",
-                        file_year,
                         "Hojas Logísticas",
+                        file_year,
                         file_month,
                     ]
                     all_folders_found, folder_id, folder_name = find_last_subfolder_id(
