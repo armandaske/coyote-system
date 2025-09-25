@@ -1434,7 +1434,6 @@ def abnb_extract_booking_info_new(soup):
         text_after_pago = pago_element.find_next('p').text.strip()
         text_after_pago = text_after_pago.replace(".", "").replace(",",".")
         payment= convert_currency_to_float(text_after_pago)
-        payment=payment*1.16 #ajustar para los montos extras de IVA y tasas que abona Airbnb, el valor se sacó empíricamente
         payments=[payment]*number_of_guests
     else:
         print("Error. Couldn't find 'Pago' in the airbnb email")
@@ -1451,7 +1450,8 @@ def abnb_extract_booking_info_new(soup):
         "end_date": end_date,
         "end_hour": end_hour,
         "confirmation_code": confirmation_code,
-        "payments": payments
+        "payments": payments,
+        "total_price": sum(payments)*(1-AIRBNB_FEE)*1.16 #I add 16% tax here since Airbnb does not include it in the payment amount
     }
     results_dict = {key: ' '.join(value.split()) if isinstance(value, str) else value for key, value in results_dict.items()}
     results_dict["experience_name"] = unificar_nombres_tours_dict.get(results_dict["experience_name"],results_dict["experience_name"]) #I homologate the tour names here right when i extract it  

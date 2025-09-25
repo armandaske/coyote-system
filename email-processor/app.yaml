@@ -10,6 +10,6 @@ env_variables:
   SECRET_ID: "web_client_secret"
   OTRO_FILE_ID: "1Fs4UPe668k6BKJC8p2opuNKJKD2JnrMVQZDvAb-VcjY" #multiday
   COYOTE_CASH_FILE_ID: "1q3sb5f8x0mkZIgDGtufsV13qFYKXT2fp3XI8Ot4UNF8"
-  FAREHARBOR_FEE: 0.035
+  FAREHARBOR_FEE: 0.0367
   AIRBNB_FEE: 0.2
   URL: "http://starlit-complex-410801.uc.r.appspot.com"
