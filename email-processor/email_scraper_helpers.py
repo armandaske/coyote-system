@@ -403,24 +403,28 @@ def dicts_from_extracted_data(extracted_data):
 
 def get_cash_dict(extracted_data):
     cash_dict={ 
-        "fecha": extracted_data.get('reservation_date',get_current_time()).split()[0], #Even if it's cancellation I kept the name reservation_date
         "tipo": "Ingreso" if extracted_data.get('total_price',0)>=0 else "Egreso",
         "cantidad": abs(extracted_data.get('total_price',0)),
         "origen": "Externo" if extracted_data.get('total_price',0)>=0 else "Origamy",
         "destino": "Origamy" if extracted_data.get('total_price',0)>=0 else "Externo",
         "forma_de_pago": extracted_data.get('sales_channel',''),
-        "descripcion":('Cancelación de ' if extracted_data.get('total_price',0)<0 else 'Reserva de ')+f"{extracted_data.get('experience_name','')} {extracted_data.get('start_date','')} x{extracted_data.get('number_of_guests',1)}",
-        "codigo_reservacion": extracted_data.get('confirmation_code',''),
-        "observaciones": '',
         "timestamp": get_current_time(),
         "input": 'Automático'
     }
+
+    if extracted_data.get('rebooking', False):
+        cash_dict['descripcion'] = 'Rebooking de ' + f"{extracted_data.get('old_experience_name','')} {extracted_data.get('old_start_date','')} x{extracted_data.get('old_number_of_guests',1)}"        
+    
+    else:
+        cash_dict["fecha"] = extracted_data.get('reservation_date',get_current_time()).split()[0] #Even if it's cancellation I kept the name reservation_date
+        cash_dict["descripcion"] = ('Cancelación de ' if extracted_data.get('total_price',0)<0 else 'Reserva de ') + f"{extracted_data.get('experience_name','')} {extracted_data.get('start_date','')} x{extracted_data.get('number_of_guests',1)}"
+        cash_dict["codigo_reservacion"] = extracted_data.get('confirmation_code','')
 
     return cash_dict
 
 
 def find_and_cancel(service, file_id, guest_name, number_of_guests, sales_channel, reservation_code, status_value):
-    # Define a range to fetch a large set of data (you can modify to match your data's size)
+    # Define a range to fetch a large set of data
     range_name = "VIAJEROS!A1:L50"
     result = service.spreadsheets().values().get(spreadsheetId=file_id, range=range_name).execute()
     values = result.get('values', [])
@@ -631,16 +635,18 @@ def rebooking_logic(drive_service, sheets_service, msg, platform):
             # Extract guest name, experience name, booking date
             try:
                 if platform=='Airbnb':
-                    extracted_data=abnb_extract_rebooking_info(soup)
+                    old_extracted_data=abnb_extract_rebooking_info(soup)
                 elif platform=='Fareharbor':
-                    extracted_data=fh_extract_rebooking_info(soup)
-                guest_name=extracted_data.get('guest_name')
-                number_of_guests=extracted_data.get('number_of_guests',1)
-                sales_channel=extracted_data.get('sales_channel')
-                old_experience_name=extracted_data.get('experience_name')
-                old_start_date=extracted_data.get('start_date')
-                old_start_hour=extracted_data.get('start_hour')
-                old_confirmation_code=extracted_data.get('confirmation_code')
+                    old_extracted_data=fh_extract_rebooking_info(soup)
+                guest_name=old_extracted_data.get('guest_name')
+                old_number_of_guests=old_extracted_data.get('old_number_of_guests',1)
+                sales_channel=old_extracted_data.get('sales_channel')
+                old_experience_name=old_extracted_data.get('old_experience_name')
+                old_start_date=old_extracted_data.get('old_start_date')
+                old_start_hour=old_extracted_data.get('old_start_hour')
+                old_confirmation_code=old_extracted_data.get('old_confirmation_code')
+                cash_dict=get_cash_dict(old_extracted_data)
+
             except Exception as error:
                 print("The specified element was not found in the HTML for rebooking logic",str(error))
                 return
@@ -668,7 +674,7 @@ def rebooking_logic(drive_service, sheets_service, msg, platform):
 
     else:    
         for id_ in old_file_id:
-            rebooked=find_and_cancel(sheets_service, id_, guest_name, number_of_guests, sales_channel, old_confirmation_code,"REBOOKED⚠️")
+            rebooked=find_and_cancel(sheets_service, id_, guest_name, old_number_of_guests, sales_channel, old_confirmation_code,"REBOOKED⚠️")
             if rebooked:
                 break
 
@@ -683,9 +689,112 @@ def rebooking_logic(drive_service, sheets_service, msg, platform):
         print(f"{guest_name} marked as Rebooked in {old_file_name}, will try to make reservation for new date")
     else:
         print(f"{old_confirmation_code} marked as Rebooked in {old_file_name}, will try to make reservation for new date")
-    if booking_logic(drive_service,sheets_service,msg,platform):
-        return True
-    return
+
+    #At this point, cancellation is done in the old reservation. Now I have to make the new reservation
+    try:
+        if platform=='Airbnb':
+            extracted_data=abnb_extract_booking_info_new(soup)
+            if not extracted_data:
+                extracted_data=abnb_extract_booking_info(soup)
+            extracted_data['reservation_date']=convert_date_format(msg_date, 6) #UTC-6
+        elif platform=='Fareharbor':
+            extracted_data=fh_extract_booking_info(soup)
+        start_date = extracted_data.get('start_date')
+        start_hour = extracted_data.get('start_hour')
+        experience_name = extracted_data.get('experience_name') 
+        itinerario_dict,list_of_viajero_dicts=dicts_from_extracted_data(extracted_data)    
+        #update cash dict to include new booking info
+        cash_dict["fecha"] = extracted_data.get('reservation_date',get_current_time()).split()[0] #Even if it's cancellation I kept the name reservation_date
+        cash_dict["codigo_reservacion"] = extracted_data.get('confirmation_code','')
+
+
+    except Exception as error:
+        print("The specified element was not found in the HTML for booking logic",str(error))
+        return    
+
+    try:
+        raw_file_name = '-'.join(reversed(start_date.split('-')))+f' @{start_hour} '+experience_name
+        file_name = clean_filename(raw_file_name)
+        year= get_year_from_date(start_date)
+        month= get_month_from_date(start_date)
+        folders=['Workflow Coyote Armando Technologies','Hojas Logísticas', year, month]
+        all_folders_found, folder_id, folder_name=find_last_subfolder_id(drive_service, folders)
+        if all_folders_found:
+            pass
+        elif folder_id and folder_name:
+            print("No se encontraron todos los subfolders, se intentará crearlos")
+            split_element = folder_name
+            if split_element in folders:
+                split_index = folders.index(split_element)
+                folders = folders[split_index :]    
+                folder_id = create_folder_tree(drive_service,folders, folder_id)
+        else:
+            print(f"It was not possible to fetch the folder {folder_name}")
+            return
+    except Exception as error:
+        print('Error trying to find existing folder: ',str(error))
+        return    
+    
+    try:
+        file_id=find_existing_file(drive_service ,file_name, folder_id)      
+    except Exception as error:
+        print('Error trying to find existing file: ',str(error))
+        return       
+
+    #There's no file, this is the first guest. Create new file and fill both the itinerario and viajeros sheet
+    if not file_id:
+        
+        try:
+            raw_file_name_ = 'BASE'+' '+experience_name
+            file_name_ = clean_filename(raw_file_name_)
+            folders_=['Workflow Coyote Armando Technologies', 'Bases HL']
+            all_folders_found_, folder_id_, folder_name_=find_last_subfolder_id(drive_service, folders_)
+            if all_folders_found_:
+                pass
+            elif folder_id_ and folder_name_:
+                print("No se encontraron todos los subfolders, se intentará crearlos")
+                split_element_ = folder_name_
+                if split_element_ in folders_:
+                    split_index_ = folders_.index(split_element_)
+                    folders_ = folders_[split_index_ :]    
+                    folder_id_ = create_folder_tree(drive_service,folders_, folder_id_)
+            else:
+                print(f"It was not possible to fetch the folder {folder_name}")
+                return
+        except Exception as error:
+            print('Error trying to find existing folder: ',str(error))
+            return    
+        
+        try:
+            original_id=find_existing_file(drive_service ,file_name_, folder_id_, second_search=True)      
+        except Exception as error:
+            print('Error trying to find existing file: ',str(error))
+            return
+        
+        if not original_id:    
+            original_id=OTRO_FILE_ID 
+        else:
+            original_id=original_id[0] #find_existing_file() returns either a list or None, so I take the first (only) value.
+            
+        print('Attempting to create a new file')
+        file_metadata = copy_and_rename_sheet(drive_service,original_id, file_name, folder_id)
+        file_id = file_metadata['id']
+        print(f'New file created: {file_name} id:{file_id}')
+        write_itinerario(sheets_service, itinerario_dict, file_id)    
+        write_viajeros(sheets_service, list_of_viajero_dicts, file_id)
+        cash_dict['observaciones'] = f"https://docs.google.com/spreadsheets/d/{file_id}" #I add the file id to the observations of the cash entry so I can track it later if needed
+        write_cash(sheets_service, cash_dict, COYOTE_CASH_FILE_ID)
+        print('Itinerario and Viajeros information added to new file')
+
+    #The file already exists, just fill the new bookings of the viajeros sheet
+    else:    
+        print(f'Adding new reservations to file {file_name}')
+        update_numeration(sheets_service, file_id[0])  #If there's more than 1 file with the same name i use the most recently created one
+        write_viajeros(sheets_service, list_of_viajero_dicts, file_id[0])
+        cash_dict['observaciones'] = f"https://docs.google.com/spreadsheets/d/{file_id[0]}" #I add the file id to the observations of the cash entry so I can track it later if needed
+        write_cash(sheets_service, cash_dict, COYOTE_CASH_FILE_ID)
+
+    return True
 
 def cancellation_logic(drive_service,sheets_service,msg,platform):
     for part in msg.iter_parts():
@@ -1044,49 +1153,65 @@ def fh_extract_booking_info(soup):
     return results_dict
 
 def fh_extract_rebooking_info(soup):
-    booking_table = soup.find('th', string=re.compile("Old",re.IGNORECASE)).find_parent('table')
-    if booking_table:
-        rows = booking_table.find_all('tr')[1:]  # Exclude the header row
-        data = {}
-        for row in rows:
-            cells = row.find_all('td')
+    #Find the table with the old booking information
+    old_booking_table = soup.find('th', string=re.compile("Old",re.IGNORECASE)).find_parent('table')
+    if old_booking_table:
+        old_rows = old_booking_table.find_all('tr')[1:]  # Exclude the header row
+        old_data = {}
+        for old_row in old_rows:
+            cells = old_row.find_all('td')
             key = cells[0].get_text(strip=True)
             value = cells[1].get_text(strip=True)
-            data[key] = value
+            old_data[key] = value
         # Now, assign the variables
-        confirmation_code = data.get('ID')
-        customers = data.get('Customers')
-        number_of_guests = int(re.search(r"(\d{1,2})", customers).group(1)) if customers else 1
-        experience_name = data.get('Item')
-        date = data.get('Date')
-        time = data.get('Time')
-        
-        start_date_raw=date.split(' - ')[0]
-        end_date_raw=date.split(' - ')[-1]
-        start_hour_raw=time.split(' - ')[0]
-        end_hour_raw=time.split(' - ')[-1]
-        
-        start_clause=start_date_raw+' @ '+start_hour_raw
-        end_clause=end_date_raw+ ' @ '+end_hour_raw
-        date_raw=start_clause+' - '+end_clause
-        start_date, start_hour, end_date, end_hour = fh_extract_date_time(date_raw)
+        old_confirmation_code = old_data.get('ID')
+        old_customers = old_data.get('Customers')
+        old_number_of_guests = int(re.search(r"(\d{1,2})", old_customers).group(1)) if old_customers else 1
+        old_experience_name = old_data.get('Item')
+        old_date = old_data.get('Date')
+        old_time = old_data.get('Time')
+
+        old_start_date_raw=old_date.split(' - ')[0]
+        old_end_date_raw=old_date.split(' - ')[-1]
+        old_start_hour_raw=old_time.split(' - ')[0]
+        old_end_hour_raw=old_time.split(' - ')[-1]
+
+        old_start_clause=old_start_date_raw+' @ '+old_start_hour_raw
+        old_end_clause=old_end_date_raw+ ' @ '+old_end_hour_raw
+        old_date_raw=old_start_clause+' - '+old_end_clause
+        old_start_date, old_start_hour, old_end_date, old_end_hour = fh_extract_date_time(old_date_raw)
     else:
         print('Table with rebooking information not found')
         return
+
     is_private_tour= soup.find('div', string=re.compile("PRIVATE TOUR|PRIVATE GROUP", re.IGNORECASE))
     if is_private_tour:
-        experience_name+=' PRIVADO'
+        old_experience_name+=' PRIVADO' #Not sure this is correct?
+    
+
+    #get due amount
+    due_amount=0
+    overpaid_amount=0
+    due_element = soup.find('b', string="Due:")
+    if due_element:
+        due_amount=convert_currency_to_float(due_element.parent.get_text(strip=True).split(':')[1])
+    else:
+        overpaid_element = soup.find('b', string="Overpaid by:")
+        if overpaid_element:
+            overpaid_amount= -convert_currency_to_float(overpaid_element.parent.get_text(strip=True).split(':')[1])
 
     results_dict={
+        'rebooking': True, #This is necessary for proper cash_dict creation
         "sales_channel": 'Fareharbor',
-        "experience_name": experience_name, 
-        "confirmation_code": confirmation_code,
-        "start_date": start_date,
-        "start_hour": start_hour,
-        "number_of_guests": number_of_guests,    
+        "old_experience_name": old_experience_name,
+        "old_confirmation_code": old_confirmation_code,
+        "old_start_date": old_start_date,
+        "old_start_hour": old_start_hour,
+        "old_number_of_guests": old_number_of_guests,
+        "total_price": due_amount*(1-FAREHARBOR_FEE) if due_amount else overpaid_amount*(1-FAREHARBOR_FEE) #I add the total price here so I can create a cash entry
     }
     results_dict = {key: ' '.join(value.split()) if isinstance(value, str) else value for key, value in results_dict.items()}
-    results_dict["experience_name"] = unificar_nombres_tours_dict.get(results_dict["experience_name"],results_dict["experience_name"]) #I homologate the tour names here right when i extract it  
+    results_dict["old_experience_name"] = unificar_nombres_tours_dict.get(results_dict["old_experience_name"],results_dict["old_experience_name"]) #I homologate the tour names here right when i extract it
     return results_dict
 
 def abnb_extract_rebooking_info(soup):
