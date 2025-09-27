@@ -855,8 +855,11 @@ def make_square_matrix(matrix): #TODO: checar cómo se ve matrix y ver si se pue
         
 def store_state(current_time,page_token, firestore_db):
     # Store the 'last_page_token' in the 'state' document of the 'app' collection
-    firestore_db.collection('app').document('state').set({'last_page_token': page_token,'retrieve_time': current_time}, merge=True)
-        
+    try:
+        firestore_db.collection('app').document('state').set({'last_page_token': page_token,'retrieve_time': current_time}, merge=True)
+    except Exception as e:
+        print('Error storing state:', str(e))
+
 
 def get_last_state(firestore_db):
     # Get the 'state' document from the 'app' collection

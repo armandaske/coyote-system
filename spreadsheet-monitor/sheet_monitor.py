@@ -23,7 +23,7 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
         page_token = drive_service.changes().getStartPageToken().execute()["startPageToken"]
 
     current_time = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
-    print(f"Looking for changes in drive @ {current_time}")
+    print(f"Looking for changes since page token {page_token} @ {current_time}")
 
     try:
         # --- Process all pages ---
@@ -167,9 +167,11 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                 doc.reference.delete()
 
     except errors.HttpError as e:
-        print(f"Drive API error: {e}, resetting page token")
+        print(f"Drive API error, resetting page token: {e}")
         page_token = drive_service.changes().getStartPageToken().execute()["startPageToken"]
+        print("New page token:", page_token)
         store_state(current_time, page_token, firestore_db)
+        return
 
     # --- Garbage collection ---
     gc.collect()
