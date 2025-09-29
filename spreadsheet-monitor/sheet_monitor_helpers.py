@@ -444,7 +444,7 @@ def get_data_hl(sheets_service, file_id, tab_name,file_name, multiday):
 def is_date_in_filename(date_str, text):
     try:
         # Parse input date string and subtract one day
-        date_obj = datetime.strptime(date_str, '%Y-%m-%d') - timedelta(days=1) #substract one day to effectively check the second day of the multiday tour
+        date_obj = datetime.strptime(date_str, '%Y-%m-%d') # - timedelta(days=1) #substract one day to effectively check the second day of the multiday tour
         
         # Create both formats
         format_1 = date_obj.strftime('%Y-%m-%d')  # e.g., 2025-01-30
