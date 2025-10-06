@@ -1,4 +1,4 @@
-runtime: python39  # Set the correct Python version here.
+runtime: python313  # Set the correct Python version here.
 instance_class: F2  # Choose the instance class based on your needs.
 entrypoint: gunicorn -b :$PORT -w 2 -t 60 app:app
 
