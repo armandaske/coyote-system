@@ -3,6 +3,8 @@ import logging
 from datetime import datetime, timedelta
 from os import getenv
 import re
+import random
+
 EMAIL_FILE_ID= str(getenv('EMAIL_FILE_ID'))
 LOG_FILE_ID= str(getenv('LOG_FILE_ID'))
 SECONDS_THRESHOLD_UPDATE = int(getenv('SECONDS_THRESHOLD_UPDATE'))
@@ -224,20 +226,16 @@ def delete_logs(sheets_service, file_id):
     print(f"Deleted {len(rows_to_delete)} rows in {sheet_name}")
     return (calendar_ids, folder_ids)
 
-def odd_minute_random():
-    return datetime.now().minute % 2 == 1
-
 def get_tabs(sheets_service, file_id, keyword, random):
     # Fetch details of the spreadsheet using the Sheets API
     spreadsheet = sheets_service.spreadsheets().get(spreadsheetId=file_id).execute()
     sheets = spreadsheet.get('sheets', [])
-    
+
     tabs_names=[]
     tabs_ids=[]
     
-    # If random is True, check if the current minute is odd
-    if random and odd_minute_random():
-        sheets=sheets[::-1]  # Reverse the order of sheets only if user chose random and there is an odd minute  
+    if random:
+        random.shuffle(sheets)  # Shuffle sheets to avoid processing order bias
 
     # Iterate through each sheet and check if the keyword is present in the sheet name
     for sheet in sheets:

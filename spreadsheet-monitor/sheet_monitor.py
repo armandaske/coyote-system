@@ -12,6 +12,7 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
     from os import getenv
     import gc
     import warnings
+    import random
 
     ROOT_ID = str(getenv("ROOT_ID"))
 
@@ -34,7 +35,10 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                 fields="nextPageToken,newStartPageToken,changes(fileId,time,changeType,file/mimeType,file/name)"
             ).execute()
 
-            for change in response.get("changes", []):
+            changes = response.get("changes", [])
+            random.shuffle(changes)  # Shuffle changes to avoid processing order bias
+
+            for change in changes:
                 file_id = change.get("fileId")
                 change_time = change.get("time")
                 if not file_id or not change_time:
@@ -102,7 +106,15 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                             tabs_names, tabs_ids = get_tabs(sheets_service, file_id, "ITINERARIO", True)
                             multiday = "SI" if len(tabs_ids) > 1 else "NO"
 
+                            # Process each ITINERARIO tab found in the spreadsheet
                             for i in range(len(tabs_ids)):
+                                change_tab_key = f'{change_key}+{tabs_names[i]}'
+
+                                # --- Deduplication check ---
+                                if firestore_db.collection("processed_changes").document(change_tab_key).get().exists:
+                                    print(f"Skipping processed tab change: {change_tab_key}")
+                                    continue
+
                                 all_data = get_data_hl(sheets_service, file_id, tabs_names[i], file_name, multiday)
                                 if not all_data:
                                     continue
@@ -139,6 +151,11 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                                             make_file_public(drive_service, photos_folder_id, "writer")
                                             attach_folder_to_calendar(calendar_service, calendar_id, photos_folder_link)
 
+                                # --- finished processing one tab ---
+                                firestore_db.collection("processed_changes").document(change_tab_key).set({
+                                    "processed_at": datetime.utcnow().isoformat()
+                                })
+        
                 # --- mark change as processed ---
                 firestore_db.collection("processed_changes").document(change_key).set({
                     "processed_at": datetime.utcnow().isoformat()
@@ -167,10 +184,7 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                 doc.reference.delete()
 
     except errors.HttpError as e:
-        print(f"Drive API error, resetting page token: {e}")
-        page_token = drive_service.changes().getStartPageToken().execute()["startPageToken"]
-        print("New page token:", page_token)
-        store_state(current_time, page_token, firestore_db)
+        print(f"Error in main sheet_monitor: {e}")
         return
 
     # --- Garbage collection ---
