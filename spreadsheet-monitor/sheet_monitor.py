@@ -32,7 +32,7 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
             response = drive_service.changes().list(
                 pageToken=page_token,
                 spaces="drive",
-                fields="nextPageToken,newStartPageToken,changes(fileId,time,changeType,file/mimeType,file/name)"
+                fields="nextPageToken,newStartPageToken,changes(fileId,time,changeType,file/mimeType,file/name,file/modifiedTime)"
             ).execute()
 
             changes = response.get("changes", [])
@@ -43,6 +43,10 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                 change_time = change.get("time")
                 if not file_id or not change_time:
                     continue
+                file = change.get("file")
+                if not file or not file.get("modifiedTime"):
+                    # Permission-only or visibility update
+                    continue    
 
                 change_key = f"{file_id}:{change_time}"
 
@@ -53,11 +57,9 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
 
                 # --- Process spreadsheet changes only ---
                 if (
-                    change["changeType"] == "file"
-                    and "file" in change
-                    and change["file"].get("mimeType") == "application/vnd.google-apps.spreadsheet"
+                    change.get("changeType") == "file"
+                    and file.get("mimeType") == "application/vnd.google-apps.spreadsheet"
                 ):
-                    file = change["file"]
                     file_name = file.get("name")
                     file_month = get_month_from_file_name(file_name)
                     file_year = get_year_from_file_name(file_name)
@@ -117,6 +119,10 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
 
                                 all_data = get_data_hl(sheets_service, file_id, tabs_names[i], file_name, multiday)
                                 if not all_data:
+                                    # --- finished processing one tab ---
+                                    firestore_db.collection("processed_changes").document(change_tab_key).set({
+                                        "processed_at": datetime.utcnow().isoformat()
+                                    })                                    
                                     continue
 
                                 keys_to_keep = [
@@ -184,9 +190,14 @@ def main_function(drive_service, sheets_service, calendar_service, firestore_db)
                 doc.reference.delete()
 
     except errors.HttpError as e:
-        print(f"Error in main sheet_monitor: {e}")
-        return
-
+        if e.resp.status == 410:  # TOKEN EXPIRED
+            print("Page token expired, getting a new one.")
+            page_token = drive_service.changes().getStartPageToken().execute()["startPageToken"]
+            store_state(current_time, page_token, firestore_db)
+            return
+        else:
+            print(f"An error occurred: {e}")
+            raise
     # --- Garbage collection ---
     gc.collect()
     return

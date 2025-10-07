@@ -226,7 +226,7 @@ def delete_logs(sheets_service, file_id):
     print(f"Deleted {len(rows_to_delete)} rows in {sheet_name}")
     return (calendar_ids, folder_ids)
 
-def get_tabs(sheets_service, file_id, keyword, random):
+def get_tabs(sheets_service, file_id, keyword, shuffle):
     # Fetch details of the spreadsheet using the Sheets API
     spreadsheet = sheets_service.spreadsheets().get(spreadsheetId=file_id).execute()
     sheets = spreadsheet.get('sheets', [])
@@ -234,7 +234,7 @@ def get_tabs(sheets_service, file_id, keyword, random):
     tabs_names=[]
     tabs_ids=[]
     
-    if random:
+    if shuffle:
         random.shuffle(sheets)  # Shuffle sheets to avoid processing order bias
 
     # Iterate through each sheet and check if the keyword is present in the sheet name
