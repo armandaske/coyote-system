@@ -888,13 +888,13 @@ def find_folder(drive_service, month, parent_folder_id):
 
 def get_year_from_file_name(file_name):
     try:
-        pattern = r'\b(\d{2}-\d{2}-\d{4})\b'
+        pattern = r'(\d{2}-\d{2}-\d{4})'
         match = re.search(pattern, file_name)
         if match:
             date= match.group(1)
             year_digits=date.split('-')[2]
             return year_digits
-        pattern = r'\b(\d{4}-\d{2}-\d{2})\b'
+        pattern = r'(\d{4}-\d{2}-\d{2})'
         match = re.search(pattern, file_name)
         if match:
             date= match.group(1)
@@ -921,13 +921,13 @@ def get_month_from_file_name(file_name):
     }
 
     try:
-        pattern = r'\b(\d{2}-\d{2}-\d{4})\b'
+        pattern = r'(\d{2}-\d{2}-\d{4})'
         match = re.search(pattern, file_name)
         if match:
             date= match.group(1)
             month_digits=date.split('-')[1]
             return(month_mapping[month_digits])
-        pattern = r'\b(\d{4}-\d{2}-\d{2})\b'
+        pattern = r'(\d{4}-\d{2}-\d{2})'
         match = re.search(pattern, file_name)
         if match:
             date= match.group(1)
